@@ -18,7 +18,6 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _index = 0;
-
   late final List<Widget> _pages;
 
   @override
@@ -32,10 +31,13 @@ class _HomeScreenState extends State<HomeScreen> {
     ];
   }
 
+  /// ✅ OPCIÓN B:
+  /// Al cerrar sesión NO desuscribimos del topic.
+  /// El dispositivo sigue recibiendo notificaciones del club.
   Future<void> _logout() async {
     await StorageService.clearSession();
-    if (!mounted) return;
 
+    if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const LoginScreen()),
       (route) => false,
@@ -45,8 +47,6 @@ class _HomeScreenState extends State<HomeScreen> {
   /// Abre la URL de Instagram del club en la app / navegador
   Future<void> _openInstagram() async {
     final club = widget.session.clubObj;
-
-    // 👇 Ajustá este nombre de propiedad si en tu modelo se llama distinto
     final rawUrl = (club.instagramUrl ?? '').toString().trim();
     if (rawUrl.isEmpty) return;
 
@@ -56,7 +56,6 @@ class _HomeScreenState extends State<HomeScreen> {
         : 'https://www.instagram.com/${rawUrl.replaceAll('@', '')}/';
 
     final uri = Uri.parse(urlString);
-
     if (await canLaunchUrl(uri)) {
       await launchUrl(
         uri,
@@ -72,11 +71,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       // ===========================
-      //        APP BAR
+      // APP BAR
       // ===========================
       appBar: AppBar(
-        backgroundColor: scheme.primary,      // 🔥 Fondo primario
-        foregroundColor: scheme.onPrimary,    // 🔥 Texto e iconos
+        backgroundColor: scheme.primary,
+        foregroundColor: scheme.onPrimary,
         title: Text(
           club.nombre,
           style: TextStyle(
@@ -86,25 +85,41 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         actions: [
-          // === BOTÓN INSTAGRAM (sólo si hay URL configurada) ===
+          // === BOTÓN INSTAGRAM ===
           Builder(
             builder: (context) {
-              // 👇 Ajustar nombre de propiedad si fuera necesario
               final ig = (club.instagramUrl ?? '').toString().trim();
               if (ig.isEmpty) return const SizedBox.shrink();
 
               return IconButton(
-  tooltip: 'Instagram del club',
-  onPressed: _openInstagram,
-  icon: Image.asset(
-    'assets/icons/instagram.png',
-    width: 24,
-    height: 24,
-    fit: BoxFit.contain,
-    // 👈 SIN "color:", dejamos los colores reales del PNG
-  ),
-);
-
+                tooltip: 'Instagram',
+                onPressed: _openInstagram,
+                icon: Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(10),
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Color(0xFFFEDA75),
+                        Color(0xFFFA7E1E),
+                        Color(0xFFD62976),
+                        Color(0xFF962FBF),
+                        Color(0xFF4F5BD5),
+                      ],
+                    ),
+                  ),
+                  child: const Center(
+                    child: Icon(
+                      Icons.camera_alt_rounded,
+                      color: Colors.white,
+                      size: 18,
+                    ),
+                  ),
+                ),
+              );
             },
           ),
 
@@ -118,25 +133,22 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
 
       // ===========================
-      //          BODY
+      // BODY
       // ===========================
       body: SafeArea(
         child: _pages[_index],
       ),
 
       // ===========================
-      //   BOTTOM NAVIGATION BAR
+      // BOTTOM NAVIGATION BAR
       // ===========================
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _index,
         onTap: (i) => setState(() => _index = i),
         type: BottomNavigationBarType.fixed,
-
-        // 🎨 Colores dinámicos según club
-        backgroundColor: scheme.primary,              // Fondo primario
-        selectedItemColor: scheme.onPrimary,          // Texto/Icono activo
+        backgroundColor: scheme.primary,
+        selectedItemColor: scheme.onPrimary,
         unselectedItemColor: scheme.onPrimary.withOpacity(0.6),
-
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.badge),

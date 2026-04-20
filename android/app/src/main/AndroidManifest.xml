@@ -25,7 +25,7 @@
     </queries>
 
     <application
-        android:label="todosobremiclub_app"
+        android:label="Todo Sobre Mi Club"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
 

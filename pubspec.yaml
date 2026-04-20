@@ -2,7 +2,7 @@ name: todosobremiclub_app
 description: "A new Flutter project."
 publish_to: 'none'
 
-version: 1.0.0+1
+version: 1.0.0+4
 
 environment:
   sdk: ^3.11.1
@@ -11,15 +11,30 @@ dependencies:
   flutter:
     sdk: flutter
 
+  # QR para carnet digital
+  qr_flutter: ^4.1.0
+
+  # HTTP para requests
   http: ^1.2.0
+
+  # Almacenamiento interno
   shared_preferences: ^2.2.3
+
+  # Iconos iOS style
   cupertino_icons: ^1.0.8
 
-  # 🔹 Para abrir la app / web de Instagram
+  # Abrir apps externas (Instagram)
   url_launcher: ^6.2.1
 
-  # 🔹 Formato de moneda ARS ($ 10.000,00)
+  # Formato de fecha/moneda ARS
   intl: ^0.19.0
+
+  # ✅ Firebase / Push Notifications
+  firebase_core: ^3.2.0
+  firebase_messaging: ^15.1.0
+
+  # ✅ Mostrar notificaciones cuando la app está abierta
+  flutter_local_notifications: ^17.0.0
 
 dev_dependencies:
   flutter_test:

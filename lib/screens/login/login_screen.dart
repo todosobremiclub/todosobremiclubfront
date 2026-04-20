@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+
 import '../../services/auth_service.dart';
 import '../../core/services/storage_service.dart';
+import '../../core/services/push_service.dart'; // ✅ NUEVO: FCM topic subscribe
 import '../../app.dart'; // 👈 para volver a MyApp después del login
 
 class LoginScreen extends StatefulWidget {
@@ -62,9 +64,13 @@ class _LoginScreenState extends State<LoginScreen> {
         throw Exception('No se pudo recuperar la sesión después del login');
       }
 
+      // ✅ 3️⃣ Suscribirse al topic del club (para push aunque la app esté cerrada)
+      // Topic esperado por backend: club_<clubId>
+      await PushService.subscribeToClub(session.clubObj.id);
+
       if (!mounted) return;
 
-      // 3️⃣ En lugar de ir directo a HomeScreen,
+      // 4️⃣ En lugar de ir directo a HomeScreen,
       //     volvemos a arrancar MyApp para que aplique AppTheme.fromClub
       Navigator.pushReplacement(
         context,
@@ -83,10 +89,23 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   @override
+  void dispose() {
+    _numeroController.dispose();
+    _dniController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    // Colores para fondo blanco
+    const textMain = Colors.black87;
+    const textMuted = Colors.black54;
+    const borderEnabled = Colors.black38;
+    const borderFocused = Colors.black87;
+
     return Scaffold(
-      // Fondo verde oscuro
-      backgroundColor: const Color(0xFF004225),
+      // ✅ Fondo blanco
+      backgroundColor: Colors.white,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -94,74 +113,63 @@ class _LoginScreenState extends State<LoginScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Logo
+                // ✅ Logo (sin título debajo)
                 Image.asset(
                   'assets/img/logo-tsmc.png',
-                  height: 120,
+                  height: 160, // podés subir/bajar (ej 140/180)
                   fit: BoxFit.contain,
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 36),
 
-                // Título
-                const Text(
-                  'Todo Sobre Mi Club',
-                  style: TextStyle(
-                    fontSize: 26,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 40),
-
-                // Campo USUARIO (teclado numérico, pero mantiene label "Usuario")
+                // Campo USUARIO (teclado numérico)
                 TextField(
                   controller: _numeroController,
-                  keyboardType: TextInputType.number, // ✅ teclado numérico
+                  keyboardType: TextInputType.number,
                   inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly, // ✅ solo números
+                    FilteringTextInputFormatter.digitsOnly,
                   ],
-                  style: const TextStyle(color: Colors.white),
+                  style: const TextStyle(color: textMain),
                   decoration: InputDecoration(
                     labelText: 'Usuario',
-                    labelStyle: const TextStyle(color: Colors.white70),
-                    prefixIcon: const Icon(Icons.person, color: Colors.white70),
+                    labelStyle: const TextStyle(color: textMuted),
+                    prefixIcon: const Icon(Icons.person, color: textMuted),
                     enabledBorder: OutlineInputBorder(
-                      borderSide: const BorderSide(color: Colors.white54),
+                      borderSide: const BorderSide(color: borderEnabled),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderSide: const BorderSide(color: Colors.white),
+                      borderSide: const BorderSide(color: borderFocused),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     filled: true,
-                    fillColor: Colors.white.withOpacity(0.05),
+                    fillColor: Colors.black.withOpacity(0.04),
                   ),
                 ),
                 const SizedBox(height: 20),
 
-                // Campo CONTRASEÑA (teclado numérico, oculto, mantiene label "Contraseña")
+                // Campo CONTRASEÑA (teclado numérico, oculto)
                 TextField(
                   controller: _dniController,
-                  keyboardType: TextInputType.number, // ✅ teclado numérico
+                  keyboardType: TextInputType.number,
                   inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly, // ✅ solo números
+                    FilteringTextInputFormatter.digitsOnly,
                   ],
                   obscureText: true,
-                  style: const TextStyle(color: Colors.white),
+                  style: const TextStyle(color: textMain),
                   decoration: InputDecoration(
                     labelText: 'Contraseña',
-                    labelStyle: const TextStyle(color: Colors.white70),
-                    prefixIcon: const Icon(Icons.lock, color: Colors.white70),
+                    labelStyle: const TextStyle(color: textMuted),
+                    prefixIcon: const Icon(Icons.lock, color: textMuted),
                     enabledBorder: OutlineInputBorder(
-                      borderSide: const BorderSide(color: Colors.white54),
+                      borderSide: const BorderSide(color: borderEnabled),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderSide: const BorderSide(color: Colors.white),
+                      borderSide: const BorderSide(color: borderFocused),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     filled: true,
-                    fillColor: Colors.white.withOpacity(0.05),
+                    fillColor: Colors.black.withOpacity(0.04),
                   ),
                 ),
                 const SizedBox(height: 30),

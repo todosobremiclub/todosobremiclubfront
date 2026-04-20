@@ -1,5 +1,4 @@
 import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
@@ -28,8 +27,8 @@ class _RecibosScreenState extends State<RecibosScreen> {
     final clubId = widget.session.clubObj.id;
     final socioId = widget.session.socioObj.id;
     final token = widget.session.token;
-
     final anioActual = DateTime.now().year;
+
     final url = Uri.parse(
       '${ApiConfig.baseUrl}/club/$clubId/pagos/$socioId?anio=$anioActual',
     );
@@ -60,7 +59,6 @@ class _RecibosScreenState extends State<RecibosScreen> {
     final recibos = pagosRaw.map<_ReciboPago>((p) {
       final mes = int.tryParse('${p['mes']}') ?? 0;
 
-      // ✅ PARSEO CORRECTO DEL MONTO (string o num)
       final monto = p['monto'] == null
           ? 0.0
           : double.tryParse(p['monto'].toString()) ?? 0.0;
@@ -75,7 +73,7 @@ class _RecibosScreenState extends State<RecibosScreen> {
       );
     }).toList();
 
-    // Ordenamos de más reciente a más antiguo (por año/mes)
+    // Orden descendente
     recibos.sort((a, b) {
       final ka = a.anio * 100 + a.mes;
       final kb = b.anio * 100 + b.mes;
@@ -114,17 +112,14 @@ class _RecibosScreenState extends State<RecibosScreen> {
           return Center(
             child: Text(
               'No hay pagos registrados todavía.',
-              style: TextStyle(
-                fontSize: 16,
-                color: scheme.onBackground,
-              ),
+              style: TextStyle(fontSize: 16, color: scheme.onBackground),
               textAlign: TextAlign.center,
             ),
           );
         }
 
         return ListView.builder(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(12),
           itemCount: recibos.length,
           itemBuilder: (context, index) {
             final r = recibos[index];
@@ -143,28 +138,28 @@ class _RecibosScreenState extends State<RecibosScreen> {
   ) {
     final scheme = Theme.of(context).colorScheme;
 
-    final nombreCompleto =
-        '${socio.apellido} ${socio.nombre}'.trim();
+    final nombreCompleto = '${socio.apellido} ${socio.nombre}'.trim();
     final actividad = (socio.actividad ?? '').toString();
     final categoria = (socio.categoria ?? '').toString();
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
         color: scheme.primary,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.25),
-            blurRadius: 6,
-            offset: const Offset(0, 3),
+            color: Colors.black.withOpacity(0.18),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // HEADER PEQUEÑO
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -176,16 +171,16 @@ class _RecibosScreenState extends State<RecibosScreen> {
                       club.nombre,
                       style: TextStyle(
                         color: scheme.onPrimary,
-                        fontSize: 16,
+                        fontSize: 13,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 1),
                     Text(
                       'Recibo de pago',
                       style: TextStyle(
                         color: scheme.onPrimary.withOpacity(0.85),
-                        fontSize: 14,
+                        fontSize: 11,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -197,45 +192,31 @@ class _RecibosScreenState extends State<RecibosScreen> {
                 style: TextStyle(
                   color: scheme.onPrimary,
                   fontWeight: FontWeight.w700,
+                  fontSize: 12,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          Divider(color: scheme.onPrimary.withOpacity(0.25)),
-          const SizedBox(height: 8),
 
-          _rowLabelValue(context, label: 'Socio', value: nombreCompleto),
-          _rowLabelValue(context, label: 'DNI', value: socio.dni.toString()),
-          _rowLabelValue(
-              context, label: 'Actividad', value: actividad.isEmpty ? '—' : actividad),
-          _rowLabelValue(
-              context, label: 'Categoría', value: categoria.isEmpty ? '—' : categoria),
+          const SizedBox(height: 6),
+          Divider(color: scheme.onPrimary.withOpacity(0.25), height: 12),
+          const SizedBox(height: 4),
 
-          const SizedBox(height: 10),
-          Divider(color: scheme.onPrimary.withOpacity(0.25)),
-          const SizedBox(height: 8),
+          // DATOS REDUCIDOS
+          _rowLabelValue(context, label: 'Socio', value: nombreCompleto, fontSize: 12),
+          _rowLabelValue(context, label: 'DNI', value: socio.dni.toString(), fontSize: 12),
+          _rowLabelValue(context, label: 'Actividad', value: actividad.isEmpty ? '—' : actividad, fontSize: 12),
+          _rowLabelValue(context, label: 'Categoría', value: categoria.isEmpty ? '—' : categoria, fontSize: 12),
 
-          _rowLabelValue(
-              context, label: 'Mes abonado', value: recibo.mesNombreConAnio),
-          _rowLabelValue(
-              context, label: 'Fecha de pago', value: recibo.fechaPagoDMY),
-          _rowLabelValue(
-              context, label: 'Monto', value: recibo.montoFormatoArs),
+          const SizedBox(height: 6),
+          Divider(color: scheme.onPrimary.withOpacity(0.25), height: 12),
+          const SizedBox(height: 4),
 
-          const SizedBox(height: 12),
+          _rowLabelValue(context, label: 'Mes abonado', value: recibo.mesNombreConAnio, fontSize: 12),
+          _rowLabelValue(context, label: 'Fecha de pago', value: recibo.fechaPagoDMY, fontSize: 12),
+          _rowLabelValue(context, label: 'Monto', value: recibo.montoFormatoArs, fontSize: 12),
 
-          Align(
-            alignment: Alignment.centerRight,
-            child: Text(
-              'Válido como comprobante de pago',
-              style: TextStyle(
-                color: scheme.onPrimary.withOpacity(0.85),
-                fontSize: 11,
-                fontStyle: FontStyle.italic,
-              ),
-            ),
-          ),
+          // ❌ Sacado: "Válido como comprobante de pago"
         ],
       ),
     );
@@ -245,10 +226,11 @@ class _RecibosScreenState extends State<RecibosScreen> {
     BuildContext context, {
     required String label,
     required String value,
+    double fontSize = 13,
   }) {
     final scheme = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
+      padding: const EdgeInsets.symmetric(vertical: 1),
       child: Row(
         children: [
           Text(
@@ -256,6 +238,7 @@ class _RecibosScreenState extends State<RecibosScreen> {
             style: TextStyle(
               color: scheme.onPrimary.withOpacity(0.9),
               fontWeight: FontWeight.w600,
+              fontSize: fontSize,
             ),
           ),
           Expanded(
@@ -265,6 +248,7 @@ class _RecibosScreenState extends State<RecibosScreen> {
               style: TextStyle(
                 color: scheme.onPrimary,
                 fontWeight: FontWeight.w500,
+                fontSize: fontSize,
               ),
             ),
           ),
@@ -316,8 +300,8 @@ class _ReciboPago {
     try {
       final d = DateTime.parse(fechaPagoIso);
       return '${d.day.toString().padLeft(2, '0')}/'
-             '${d.month.toString().padLeft(2, '0')}/'
-             '${d.year}';
+          '${d.month.toString().padLeft(2, '0')}/'
+          '${d.year}';
     } catch (_) {
       return fechaPagoIso.length >= 10
           ? fechaPagoIso.substring(0, 10)
