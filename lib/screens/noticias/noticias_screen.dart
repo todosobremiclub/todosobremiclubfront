@@ -138,14 +138,13 @@ class _NoticiasScreenState extends State<NoticiasScreen> {
                   final noticias = data.noticias;
 
                   if (noticias.isEmpty) {
-                    widget.onUnreadCountChanged?.call(0);
-                    return const Center(
-                      child: Text(
-                        'Sin noticias.',
-                        style: TextStyle(color: Colors.black),
-                      ),
-                    );
-                  }
+  return const Center(
+    child: Text(
+      'Sin noticias.',
+      style: TextStyle(color: Colors.black),
+    ),
+  );
+}
 
                   final pages = noticias.map((n) {
                     final titulo = (n['titulo'] ?? '').toString();
