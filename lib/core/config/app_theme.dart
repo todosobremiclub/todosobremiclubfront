@@ -19,9 +19,9 @@ class AppTheme {
       secondary: secondary,
       onSecondary: accent,
       background: secondary,        // Fondo general
-      onBackground: Colors.white,   // Texto global blanco
+      onBackground: Colors.black87,   
       surface: Colors.white,
-      onSurface: Colors.white,      // Texto sobre superficies por defecto
+      onSurface: Colors.black87,      // Texto sobre superficies por defecto
       error: Colors.red,
       onError: Colors.white,
     );
@@ -49,11 +49,11 @@ class AppTheme {
 
       // ===== Botones =====
       elevatedButtonTheme: ElevatedButtonThemeData(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: primary,
-          foregroundColor: Colors.white,
-        ),
-      ),
+  style: ElevatedButton.styleFrom(
+    backgroundColor: primary,
+    foregroundColor: accent,
+  ),
+),
 
       // ===== BottomNavigationBar =====
       bottomNavigationBarTheme: BottomNavigationBarThemeData(
@@ -62,19 +62,30 @@ class AppTheme {
         unselectedItemColor: accent.withOpacity(0.6),
       ),
 
-      // ===== Texto global BLANCO =====
-      textTheme: const TextTheme(
-        bodyLarge: TextStyle(color: Colors.white),
-        bodyMedium: TextStyle(color: Colors.white),
-        bodySmall: TextStyle(color: Colors.white),
-        titleLarge: TextStyle(color: Colors.white),
-        titleMedium: TextStyle(color: Colors.white),
-        titleSmall: TextStyle(color: Colors.white),
-        labelLarge: TextStyle(color: Colors.white),
-      ),
+      // ===== Texto global basado en la paleta del club =====
+      textTheme: TextTheme(
+  bodyLarge: TextStyle(color: primary),
+  bodyMedium: TextStyle(color: primary),
+  bodySmall: TextStyle(color: secondary),
+  titleLarge: TextStyle(
+    color: primary,
+    fontWeight: FontWeight.bold,
+  ),
+  titleMedium: TextStyle(
+    color: primary,
+    fontWeight: FontWeight.w600,
+  ),
+  titleSmall: TextStyle(color: primary),
+  labelLarge: TextStyle(
+    color: accent,
+    fontWeight: FontWeight.w600,
+  ),
+),
 
-      // Íconos globales blancos
-      iconTheme: const IconThemeData(color: Colors.white),
+
+
+      // Íconos globales con color secundario
+      iconTheme: IconThemeData(color: secondary),
     );
   }
 

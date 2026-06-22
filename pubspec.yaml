@@ -2,7 +2,7 @@ name: todosobremiclub_app
 description: "A new Flutter project."
 publish_to: 'none'
 
-version: 1.0.0+4
+version: 1.0.6+6
 
 environment:
   sdk: ^3.11.1
@@ -13,6 +13,9 @@ dependencies:
 
   # QR para carnet digital
   qr_flutter: ^4.1.0
+
+  # 📸 Cámara / fotos
+  image_picker: ^1.2.2
 
   # HTTP para requests
   http: ^1.2.0
@@ -27,14 +30,17 @@ dependencies:
   url_launcher: ^6.2.1
 
   # Formato de fecha/moneda ARS
-  intl: ^0.19.0
+  intl: ^0.20.2
 
-  # ✅ Firebase / Push Notifications
-  firebase_core: ^3.2.0
-  firebase_messaging: ^15.1.0
+  # Firebase / Push Notifications
+  firebase_core: ^4.10.0
+  firebase_messaging: ^16.3.0
 
-  # ✅ Mostrar notificaciones cuando la app está abierta
-  flutter_local_notifications: ^17.0.0
+  # Mostrar notificaciones cuando la app está abierta
+  flutter_local_notifications: ^22.0.1
+
+  # ✅ EFECTO PASAR HOJA (LIBRO / DIARIO)
+  flutter_page_curl: ^0.1.0
 
 dev_dependencies:
   flutter_test:
@@ -42,9 +48,23 @@ dev_dependencies:
 
   flutter_lints: ^6.0.0
 
+  # ✅ GENERADOR DE ICONO DE APP
+  flutter_launcher_icons: ^0.13.1
+
+# ✅ CONFIGURACIÓN DEL ICONO
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icons/logo_app.png"
+  min_sdk_android: 21
+
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/icons/logo_app.png"
+
 flutter:
   uses-material-design: true
 
   assets:
     - assets/img/logo-tsmc.png
     - assets/icons/instagram.png
+    - assets/icons/logo_app.png

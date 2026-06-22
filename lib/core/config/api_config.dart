@@ -8,4 +8,14 @@ class ApiConfig {
 
   /// URL completa del login (por si la querés usar directo)
   static String get appLoginUrl => '$baseUrl$appLogin';
+
+  /// Transferencias - App Socio
+  static const String transferStart = '/app/payments/transfer/start';
+  static const String transferProof = '/app/payments/transfer/proof';
+  static const String transferConfig = '/app/club/transferencia-config';
+
+  /// URLs completas
+  static String get transferStartUrl => '$baseUrl$transferStart';
+  static String get transferProofUrl => '$baseUrl$transferProof';
+  static String get transferConfigUrl => '$baseUrl$transferConfig';
 }

@@ -1,14 +1,13 @@
-import java.util.Properties
+ import java.util.Properties
 import java.io.FileInputStream
 
 plugins {
     id("com.android.application")
-    id("kotlin-android")
 
     // ✅ Firebase (lee android/app/google-services.json)
     id("com.google.gms.google-services")
 
-    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
+    // ✅ Plugin oficial de Flutter (maneja Kotlin internamente)
     id("dev.flutter.flutter-gradle-plugin")
 }
 
@@ -21,33 +20,38 @@ if (keystorePropertiesFile.exists()) {
 
 android {
     namespace = "com.example.todosobremiclub_app"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
 
-        // ✅ Necesario para flutter_local_notifications (Java 8+ APIs en Android)
+kotlinOptions {
+    jvmTarget = "17"
+}
+
+        // ✅ Necesario para APIs Java 8+ (notificaciones, etc)
         isCoreLibraryDesugaringEnabled = true
     }
 
-    kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_17.toString()
-    }
+    // ✅ YA NO usamos kotlinOptions manual
+    // Flutter gestiona Kotlin internamente
 
     defaultConfig {
-        applicationId = "com.todosobremiclub.app"
-        minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
-        versionCode = flutter.versionCode
-        versionName = flutter.versionName
-    }
+    applicationId = "com.todosobremiclub.app"
 
-    // 🔐 Configuración de firma para RELEASE usando el keystore
+    minSdk = flutter.minSdkVersion
+    targetSdk = 35
+
+    versionCode = flutter.versionCode
+    versionName = flutter.versionName
+}
+
+
+    // 🔐 Firma release con key.properties
     signingConfigs {
         create("release") {
-            // Solo si key.properties existe
             if (keystoreProperties.isNotEmpty()) {
                 keyAlias = keystoreProperties["keyAlias"] as String
                 keyPassword = keystoreProperties["keyPassword"] as String
@@ -59,20 +63,19 @@ android {
 
     buildTypes {
         getByName("release") {
-            // ⚠️ Ya NO usamos la firma debug: firmamos con la release
             signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = false
             isShrinkResources = false
         }
         getByName("debug") {
-            // La config debug queda como está, no hace falta tocarla
+            // sin cambios
         }
     }
 }
 
-// ✅ Dependencia requerida por core library desugaring
+// ✅ Necesario para desugaring
 dependencies {
-    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }
 
 flutter {

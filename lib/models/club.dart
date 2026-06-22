@@ -7,8 +7,10 @@ class Club {
   final String? colorSecondary; // "#1e40af"
   final String? colorAccent;    // "#facc15"
 
+  // ✅ CLAVE PARA TRANSFERENCIAS
+  final bool transferenciaHabilitada;
 
-  // 👉 Nuevo campo para Instagram
+  // 👉 Instagram
   final String? instagramUrl;
 
   Club({
@@ -19,25 +21,32 @@ class Club {
     this.colorSecondary,
     this.colorAccent,
     this.instagramUrl,
+    required this.transferenciaHabilitada,
   });
 
   factory Club.fromJson(Map<String, dynamic> json) {
     return Club(
       id: (json['id'] ?? '').toString(),
 
-      // tu backend devuelve "nombre"
-      // si algún día devuelve "name", también lo soportamos
       nombre: (json['nombre'] ?? json['name'] ?? '').toString(),
 
       logoUrl: (json['logo_url'] ?? json['logoUrl'])?.toString(),
-      colorPrimary: (json['color_primary'] ?? json['colorPrimary'])?.toString(),
+
+      colorPrimary:
+          (json['color_primary'] ?? json['colorPrimary'])?.toString(),
+
       colorSecondary:
           (json['color_secondary'] ?? json['colorSecondary'])?.toString(),
-      colorAccent: (json['color_accent'] ?? json['colorAccent'])?.toString(),
 
-      // 👇 Ajustá 'instagram_url' si tu backend devuelve otra clave
-      instagramUrl: (json['instagram_url'] ?? json['instagramUrl'] ?? '')
-          .toString(),
+      colorAccent:
+          (json['color_accent'] ?? json['colorAccent'])?.toString(),
+
+      instagramUrl:
+          (json['instagram_url'] ?? json['instagramUrl'])?.toString(),
+
+      // ✅ 🔥 ESTE ES EL FIX IMPORTANTE
+      transferenciaHabilitada:
+          json['transferencia_habilitada'] == true,
     );
   }
 
@@ -50,6 +59,7 @@ class Club {
       'color_secondary': colorSecondary,
       'color_accent': colorAccent,
       'instagram_url': instagramUrl,
+      'transferencia_habilitada': transferenciaHabilitada,
     };
   }
 }
