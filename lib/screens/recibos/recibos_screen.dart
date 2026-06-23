@@ -423,7 +423,7 @@ else ...[
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'Comprobante (opcional)',
+                  'Indique desde que cuenta se realiza la transferencia',
                   style: TextStyle(
                     color: scheme.onSurface,
                     fontWeight: FontWeight.w600,

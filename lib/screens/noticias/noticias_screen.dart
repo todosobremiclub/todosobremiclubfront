@@ -34,32 +34,25 @@ class _NoticiasScreenState extends State<NoticiasScreen> {
   }
 
   Future<_NoticiasViewData> _loadNoticiasViewData() async {
-    final noticias = await _service.getNoticias(
-      token: widget.session.token,
-      clubId: widget.session.clubObj.id,
-    );
+  final noticias = await _service.getNoticias(
+    token: widget.session.token,
+    clubId: widget.session.clubObj.id,
+  );
 
-    final prefs = await SharedPreferences.getInstance();
-    _leidas = prefs.getStringList(_kNoticiasLeidas)?.toSet() ?? <String>{};
+  final prefs = await SharedPreferences.getInstance();
+  _leidas = prefs.getStringList(_kNoticiasLeidas)?.toSet() ?? <String>{};
 
-    if (noticias.isNotEmpty) {
-      final primeraKey = _noticiaKey(noticias.first);
-      if (!_leidas.contains(primeraKey)) {
-        _leidas = {..._leidas, primeraKey};
-        await prefs.setStringList(_kNoticiasLeidas, _leidas.toList());
-      }
-    }
+  final unreadCount =
+      noticias.where((n) => !_leidas.contains(_noticiaKey(n))).length;
 
-    final unreadCount =
-        noticias.where((n) => !_leidas.contains(_noticiaKey(n))).length;
+  widget.onUnreadCountChanged?.call(unreadCount);
 
-    widget.onUnreadCountChanged?.call(unreadCount);
+  return _NoticiasViewData(
+    noticias: noticias,
+    unreadCount: unreadCount,
+  );
+}
 
-    return _NoticiasViewData(
-      noticias: noticias,
-      unreadCount: unreadCount,
-    );
-  }
 
   String _noticiaKey(Map<String, dynamic> noticia) {
     final id = (noticia['id'] ?? '').toString().trim();
@@ -71,33 +64,26 @@ class _NoticiasScreenState extends State<NoticiasScreen> {
   }
 
   Future<void> _marcarComoLeida(
-    Map<String, dynamic> noticia,
-    List<Map<String, dynamic>> todasLasNoticias,
-  ) async {
-    final key = _noticiaKey(noticia);
-    if (_leidas.contains(key)) return;
+  Map<String, dynamic> noticia,
+  List<Map<String, dynamic>> todasLasNoticias,
+) async {
+  final key = _noticiaKey(noticia);
+  if (_leidas.contains(key)) return;
 
-    _leidas = {..._leidas, key};
+  _leidas = {..._leidas, key};
 
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList(_kNoticiasLeidas, _leidas.toList());
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setStringList(_kNoticiasLeidas, _leidas.toList());
 
-    final unreadCount = todasLasNoticias
-        .where((n) => !_leidas.contains(_noticiaKey(n)))
-        .length;
+  final unreadCount = todasLasNoticias
+      .where((n) => !_leidas.contains(_noticiaKey(n)))
+      .length;
 
-    widget.onUnreadCountChanged?.call(unreadCount);
+  widget.onUnreadCountChanged?.call(unreadCount);
 
-    if (!mounted) return;
-    setState(() {
-      _future = Future.value(
-        _NoticiasViewData(
-          noticias: todasLasNoticias,
-          unreadCount: unreadCount,
-        ),
-      );
-    });
-  }
+  if (!mounted) return;
+  setState(() {});
+}
 
   @override
   Widget build(BuildContext context) {
