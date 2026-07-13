@@ -152,14 +152,18 @@ class _NoticiasScreenState extends State<NoticiasScreen> {
 
                     return GestureDetector(
                       onTap: () async {
-                        if (!mounted) return;
-                        await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => NoticiaDetalleScreen(noticia: n),
-                          ),
-                        );
-                      },
+  if (!mounted) return;
+
+  // ✅ MARCAR COMO LEIDA ANTES DE ABRIR
+  await _marcarComoLeida(n, noticias);
+
+  await Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => NoticiaDetalleScreen(noticia: n),
+    ),
+  );
+},
                       child: Container(
                         margin: const EdgeInsets.symmetric(
                           horizontal: 8,
@@ -343,11 +347,7 @@ Row(
                               onPageChanged: (page) async {
                                 if (!mounted) return;
                                 setState(() => _pageIndex = page);
-                                await _marcarComoLeida(
-                                  noticias[page],
-                                  noticias,
-                                );
-                              },
+                                                              },
                             ),
                           ),
                         ),

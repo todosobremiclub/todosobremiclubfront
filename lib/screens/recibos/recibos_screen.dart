@@ -3,6 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+
 
 import '../../core/config/api_config.dart';
 import '../../core/services/storage_service.dart';
@@ -256,8 +261,19 @@ else ...[
   _row('Fecha', recibo.fechaPagoDMY, scheme),
   _row('Monto', recibo.montoFormatoArs, scheme),
   _row('Método', recibo.metodoPagoLabel, scheme),
+
+  const SizedBox(height: 10),
+
+  Align(
+    alignment: Alignment.centerRight,
+    child: IconButton(
+      icon: const Icon(Icons.picture_as_pdf, color: Colors.white),
+      tooltip: 'Descargar PDF',
+      onPressed: () => _descargarPdfRecibo(recibo, club),
+    ),
+  ),
 ],
-        ],
+       ],
       ),
     );
   }
@@ -560,6 +576,55 @@ else ...[
       SnackBar(content: Text(msg)),
     );
   }
+
+Future<void> _descargarPdfRecibo(_ReciboPago recibo, dynamic club) async {
+  try {
+    final pdf = pw.Document();
+
+    pdf.addPage(
+      pw.Page(
+        build: (context) => pw.Padding(
+          padding: const pw.EdgeInsets.all(24),
+          child: pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text(
+                club.nombre,
+                style: pw.TextStyle(
+                  fontSize: 20,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
+              pw.SizedBox(height: 20),
+
+pw.Text("Recibo de pago"),
+pw.SizedBox(height: 12),
+
+pw.Divider(),
+pw.SizedBox(height: 12),
+
+              pw.Text("Socio: ${widget.session.socioObj.nombre}"),
+              pw.Text("Mes: ${recibo.mesNombreConAnio}"),
+              pw.Text("Fecha: ${recibo.fechaPagoDMY}"),
+              pw.Text("Monto: ${recibo.montoFormatoArs}"),
+              pw.Text("Método: ${recibo.metodoPagoLabel}"),
+            ],
+          ),
+        ),
+      ),
+    );
+
+final bytes = await pdf.save();
+
+await Printing.layoutPdf(
+  onLayout: (format) async => bytes,
+);
+
+    _showSnack("PDF generado correctamente");
+  } catch (e) {
+    _showSnack("Error al generar PDF: $e");
+  }
+}
 
   Widget _datoTransferencia({
     required String label,
