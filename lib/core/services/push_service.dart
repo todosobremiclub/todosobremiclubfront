@@ -89,7 +89,11 @@ static Future<void> firebaseMessagingBackgroundHandler(
     }
 
     final topic = 'club_$clubId';
-    await _fm.subscribeToTopic(topic);
+    try {
+  await _fm.subscribeToTopic(topic);
+} catch (e) {
+  debugPrint("FCM ERROR: $e");
+}
     debugPrint('[FCM] subscribed topic=$topic');
   }
 
