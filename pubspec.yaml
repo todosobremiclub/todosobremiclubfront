@@ -2,7 +2,7 @@ name: todosobremiclub_app
 description: "A new Flutter project."
 publish_to: 'none'
 
-version: 2.0.0+14
+version: 2.0.0+15
 
 environment:
   sdk: ^3.11.1
@@ -13,6 +13,7 @@ dependencies:
 
   # QR para carnet digital
   qr_flutter: ^4.1.0
+  mobile_scanner: ^5.2.3
 
   # 📸 Cámara / fotos
   image_picker: ^1.2.2

@@ -1,7 +1,17 @@
 import 'package:flutter/material.dart';
 
 import '../../core/services/storage_service.dart';
+import '../../services/admin_api_service.dart';
 import '../login/login_screen.dart';
+import 'control_acceso_screen.dart';
+import 'notificacion_form_screen.dart';
+import 'noticia_form_screen.dart';
+import 'pago_form_screen.dart';
+import 'socio_form_screen.dart';
+import 'asistencia_form_screen.dart';
+import 'ingreso_form_screen.dart';
+import 'gasto_form_screen.dart';
+import 'buscar_socio_screen.dart';
 
 class AdminHomeScreen extends StatefulWidget {
   const AdminHomeScreen({super.key});
@@ -13,6 +23,7 @@ class AdminHomeScreen extends StatefulWidget {
 class _AdminHomeScreenState extends State<AdminHomeScreen> {
   AdminSession? _session;
   bool _loading = true;
+  String? _logoUrl;
 
   @override
   void initState() {
@@ -27,6 +38,19 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       _session = session;
       _loading = false;
     });
+
+    if (session != null) {
+      try {
+        final club = await AdminApiService.getClub(
+          token: session.token,
+          clubId: session.clubId,
+        );
+        if (!mounted) return;
+        setState(() => _logoUrl = club['logo_url']?.toString());
+      } catch (_) {
+        // Si falla, seguimos sin logo, no bloqueamos la pantalla
+      }
+    }
   }
 
   Future<void> _logout() async {
@@ -37,20 +61,17 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
   }
 
-  void _proximamente(String accion) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$accion: próximamente')),
+  void _abrir(Widget pantalla) {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => pantalla),
     );
   }
 
   // ======================================================
-  // Reglas de visibilidad por rol, según roles reales
-  // confirmados en la base (user_clubs.role):
-  //
-  // admin / superadmin -> todo: pago, ingreso, gastos, noticias,
-  //                        notificaciones, asistencia, buscar socio
+  // Reglas de visibilidad por rol (user_clubs.role):
+  // admin / superadmin -> todo
   // solo_lectura        -> sin acceso a la app
-  // finanzas            -> pagos de cuotas y gastos
+  // finanzas            -> pagos, ingresos, gastos
   // comunicacion        -> noticias y notificaciones
   // profesor            -> noticias, notificaciones, buscar socio
   // asistencias         -> registrar asistencias
@@ -73,6 +94,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       WidgetsBinding.instance.addPostFrameCallback((_) => _logout());
       return const Scaffold(body: SizedBox.shrink());
     }
+
+    final token = _session!.token;
+    final clubId = _session!.clubId;
 
     // 🔒 solo_lectura no tiene acceso a ninguna acción de la app
     if (_session!.role == 'solo_lectura') {
@@ -100,55 +124,73 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         titulo: 'Registrar pago de cuota',
         icono: Icons.payments,
         visible: _puede(['admin', 'finanzas']),
-        onTap: () => _proximamente('Registrar pago de cuota'),
+        onTap: () => _abrir(PagoFormScreen(token: token, clubId: clubId)),
       ),
       _AccionAdmin(
         titulo: 'Registrar ingreso',
         icono: Icons.point_of_sale,
-        visible: _puede(['admin']),
-        onTap: () => _proximamente('Registrar ingreso'),
+        visible: _puede(['admin', 'finanzas']),
+        onTap: () => _abrir(IngresoFormScreen(token: token, clubId: clubId)),
       ),
       _AccionAdmin(
         titulo: 'Registrar gasto',
         icono: Icons.receipt_long,
         visible: _puede(['admin', 'finanzas']),
-        onTap: () => _proximamente('Registrar gasto'),
+        onTap: () => _abrir(GastoFormScreen(token: token, clubId: clubId)),
       ),
       _AccionAdmin(
         titulo: 'Cargar nuevo socio',
         icono: Icons.person_add,
         visible: _puede(['admin']),
-        onTap: () => _proximamente('Cargar nuevo socio'),
+        onTap: () => _abrir(SocioFormScreen(token: token, clubId: clubId)),
       ),
       _AccionAdmin(
         titulo: 'Buscar socio',
         icono: Icons.search,
         visible: _puede(['admin', 'profesor']),
-        onTap: () => _proximamente('Buscar socio'),
+        onTap: () => _abrir(BuscarSocioScreen(token: token, clubId: clubId)),
       ),
       _AccionAdmin(
         titulo: 'Publicar noticia',
         icono: Icons.campaign,
         visible: _puede(['admin', 'comunicacion', 'profesor']),
-        onTap: () => _proximamente('Publicar noticia'),
+        onTap: () => _abrir(NoticiaFormScreen(token: token, clubId: clubId)),
       ),
       _AccionAdmin(
         titulo: 'Enviar notificación',
         icono: Icons.notifications_active,
         visible: _puede(['admin', 'comunicacion', 'profesor']),
-        onTap: () => _proximamente('Enviar notificación'),
+        onTap: () => _abrir(NotificacionFormScreen(token: token, clubId: clubId)),
       ),
       _AccionAdmin(
         titulo: 'Registrar asistencia',
         icono: Icons.fact_check,
         visible: _puede(['admin', 'asistencias']),
-        onTap: () => _proximamente('Registrar asistencia'),
+        onTap: () => _abrir(AsistenciaFormScreen(token: token, clubId: clubId)),
+      ),
+      _AccionAdmin(
+        titulo: 'Control de acceso',
+        icono: Icons.qr_code_scanner,
+        visible: _puede(['admin']),
+        onTap: () => _abrir(const ControlAccesoScreen()),
       ),
     ].where((a) => a.visible).toList();
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_session!.clubName),
+        title: Row(
+          children: [
+            if (_logoUrl != null && _logoUrl!.isNotEmpty) ...[
+              CircleAvatar(
+                radius: 16,
+                backgroundColor: Colors.white,
+                backgroundImage: NetworkImage(_logoUrl!),
+              ),
+              const SizedBox(width: 10),
+            ],
+            Expanded(child: Text(_session!.clubName, overflow: TextOverflow.ellipsis)),
+          ],
+        ),
         actions: [
           IconButton(onPressed: _logout, icon: const Icon(Icons.logout)),
         ],
