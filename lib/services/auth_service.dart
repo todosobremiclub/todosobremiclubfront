@@ -66,4 +66,41 @@ class AuthService {
 
     return Map<String, dynamic>.from(data);
   }
+
+  // ======================================================
+  // Login de ADMINISTRADOR (email + password)
+  // Mismo endpoint /auth/login que usa la web de gestión.
+  // ======================================================
+  Future<Map<String, dynamic>> loginAdmin({
+    required String email,
+    required String password,
+  }) async {
+    final Uri url = Uri.parse(ApiConfig.adminLoginUrl);
+
+    final res = await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'email': email,
+        'password': password,
+      }),
+    );
+
+    Map<String, dynamic> data;
+    try {
+      data = jsonDecode(res.body) as Map<String, dynamic>;
+    } catch (_) {
+      throw Exception('Respuesta inválida del servidor (HTTP ${res.statusCode})');
+    }
+
+    if (res.statusCode != 200 || data['ok'] != true) {
+      throw Exception(data['error'] ?? 'Credenciales incorrectas');
+    }
+
+    if (data['token'] != null) {
+      _token = data['token'];
+    }
+
+    return data;
+  }
 }

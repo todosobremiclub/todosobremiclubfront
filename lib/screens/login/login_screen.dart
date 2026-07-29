@@ -5,6 +5,7 @@ import '../../services/auth_service.dart';
 import '../../core/services/storage_service.dart';
 import '../../core/services/push_service.dart'; // ✅ NUEVO: FCM topic subscribe
 import '../../app.dart'; // 👈 para volver a MyApp después del login
+import '../admin/admin_home_screen.dart'; // ✅ NUEVO: pantalla de administración
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -20,8 +21,29 @@ class _LoginScreenState extends State<LoginScreen> {
   final AuthService _authService = AuthService();
   bool _loading = false;
 
+  // ✅ NUEVO: toggle socio / administrador
+  bool _isAdminMode = false;
+
+  void _toggleAdminMode() {
+    setState(() {
+      _isAdminMode = !_isAdminMode;
+      _numeroController.clear();
+      _dniController.clear();
+    });
+  }
+
   Future<void> _login() async {
-    // Ahora los usamos como usuario/contraseña
+    if (_isAdminMode) {
+      await _loginAdmin();
+    } else {
+      await _loginSocio();
+    }
+  }
+
+  // ======================================================
+  // Login SOCIO (flujo original, sin cambios de lógica)
+  // ======================================================
+  Future<void> _loginSocio() async {
     final usuario = _numeroController.text.trim();
     final contrasena = _dniController.text.trim();
 
@@ -35,7 +57,6 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _loading = true);
 
     try {
-      // El backend sigue esperando numeroSocio y dni, no lo tocamos
       final data = await _authService.login(
         numeroSocio: usuario,
         dni: contrasena,
@@ -51,31 +72,88 @@ class _LoginScreenState extends State<LoginScreen> {
         );
       }
 
-      // 1️⃣ Guardamos la sesión
       await StorageService.saveSession(
         token: token,
         socio: socio,
         club: club,
       );
 
-      // 2️⃣ (Opcional) volvemos a cargarla para validar que quedó bien
       final session = await StorageService.loadSession();
       if (session == null) {
         throw Exception('No se pudo recuperar la sesión después del login');
       }
 
-      // ✅ 3️⃣ Suscribirse al topic del club (para push aunque la app esté cerrada)
-      // Topic esperado por backend: club_<clubId>
       await PushService.subscribeToClub(session.clubObj.id);
 
       if (!mounted) return;
 
-      // 4️⃣ En lugar de ir directo a HomeScreen,
-      //     volvemos a arrancar MyApp para que aplique AppTheme.fromClub
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
           builder: (_) => const MyApp(),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString())),
+      );
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  // ======================================================
+  // Login ADMINISTRADOR (email + password → /auth/login)
+  // ======================================================
+  Future<void> _loginAdmin() async {
+    final email = _numeroController.text.trim();
+    final password = _dniController.text.trim();
+
+    if (email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Completá email y contraseña')),
+      );
+      return;
+    }
+
+    setState(() => _loading = true);
+
+    try {
+      final data = await _authService.loginAdmin(
+        email: email,
+        password: password,
+      );
+
+      final token = data['token'] as String?;
+      final user = data['user'] as Map<String, dynamic>?;
+
+      if (token == null || user == null) {
+        throw Exception('Respuesta inválida del servidor (faltan token/user)');
+      }
+
+      final roles = (user['roles'] as List?) ?? [];
+      if (roles.isEmpty) {
+        throw Exception('Este usuario no tiene ningún club asignado');
+      }
+
+      // Por ahora tomamos el primer rol/club (selector múltiple, a futuro)
+      final primerRol = roles.first as Map<String, dynamic>;
+
+      await StorageService.saveAdminSession(
+        token: token,
+        email: user['email'] ?? email,
+        role: primerRol['role']?.toString() ?? '',
+        clubId: primerRol['club_id']?.toString() ?? '',
+        clubName: primerRol['club_name']?.toString() ?? '',
+      );
+
+      if (!mounted) return;
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const AdminHomeScreen(),
         ),
       );
     } catch (e) {
@@ -97,14 +175,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Colores para fondo blanco
     const textMain = Colors.black87;
     const textMuted = Colors.black54;
     const borderEnabled = Colors.black38;
     const borderFocused = Colors.black87;
 
     return Scaffold(
-      // ✅ Fondo blanco
       backgroundColor: Colors.white,
       body: SafeArea(
         child: Center(
@@ -113,26 +189,30 @@ class _LoginScreenState extends State<LoginScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // ✅ Logo (sin título debajo)
                 Image.asset(
                   'assets/img/logo-tsmc.png',
-                  height: 160, // podés subir/bajar (ej 140/180)
+                  height: 160,
                   fit: BoxFit.contain,
                 ),
                 const SizedBox(height: 36),
 
-                // Campo USUARIO (teclado numérico)
+                // Campo 1: Usuario (socio) / Email (admin)
                 TextField(
                   controller: _numeroController,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly,
-                  ],
+                  keyboardType: _isAdminMode
+                      ? TextInputType.emailAddress
+                      : TextInputType.number,
+                  inputFormatters: _isAdminMode
+                      ? []
+                      : [FilteringTextInputFormatter.digitsOnly],
                   style: const TextStyle(color: textMain),
                   decoration: InputDecoration(
-                    labelText: 'Usuario',
+                    labelText: _isAdminMode ? 'Email' : 'Usuario',
                     labelStyle: const TextStyle(color: textMuted),
-                    prefixIcon: const Icon(Icons.person, color: textMuted),
+                    prefixIcon: Icon(
+                      _isAdminMode ? Icons.email : Icons.person,
+                      color: textMuted,
+                    ),
                     enabledBorder: OutlineInputBorder(
                       borderSide: const BorderSide(color: borderEnabled),
                       borderRadius: BorderRadius.circular(12),
@@ -147,13 +227,15 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 20),
 
-                // Campo CONTRASEÑA (teclado numérico, oculto)
+                // Campo 2: Contraseña (mismo para ambos modos)
                 TextField(
                   controller: _dniController,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly,
-                  ],
+                  keyboardType: _isAdminMode
+                      ? TextInputType.text
+                      : TextInputType.number,
+                  inputFormatters: _isAdminMode
+                      ? []
+                      : [FilteringTextInputFormatter.digitsOnly],
                   obscureText: true,
                   style: const TextStyle(color: textMain),
                   decoration: InputDecoration(
@@ -174,7 +256,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 30),
 
-                // Botón azul con letras blancas
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
@@ -201,6 +282,18 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           )
                         : const Text('Ingresar'),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // ✅ NUEVO: toggle socio / administrador
+                TextButton(
+                  onPressed: _loading ? null : _toggleAdminMode,
+                  child: Text(
+                    _isAdminMode
+                        ? '¿Sos socio? Ingresá acá'
+                        : '¿Sos administrador? Ingresá acá',
+                    style: const TextStyle(color: Colors.blue),
                   ),
                 ),
               ],

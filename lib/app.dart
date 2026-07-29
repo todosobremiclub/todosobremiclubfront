@@ -3,15 +3,26 @@ import 'core/services/storage_service.dart';
 import 'core/config/app_theme.dart';
 import 'screens/login/login_screen.dart';
 import 'screens/home/home_screen.dart';
+import 'screens/admin/admin_home_screen.dart'; // ✅ NUEVO
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
-  Future<AppSession?> _load() => StorageService.loadSession();
+  Future<_SesionInicial> _load() async {
+    // ✅ Primero chequeamos si hay sesión de ADMINISTRADOR guardada
+    final adminSession = await StorageService.loadAdminSession();
+    if (adminSession != null) {
+      return _SesionInicial(admin: adminSession);
+    }
+
+    // Si no hay admin, seguimos con el flujo normal de SOCIO
+    final appSession = await StorageService.loadSession();
+    return _SesionInicial(socio: appSession);
+  }
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<AppSession?>(
+    return FutureBuilder<_SesionInicial>(
       future: _load(),
       builder: (context, snapshot) {
         // Loading inicial
@@ -24,9 +35,21 @@ class MyApp extends StatelessWidget {
           );
         }
 
-        final session = snapshot.data;
+        final resultado = snapshot.data;
 
-        // ✅ Theme dinámico si hay sesión
+        // ✅ Caso ADMINISTRADOR: sin theme dinámico de club, va directo
+        if (resultado?.admin != null) {
+          return MaterialApp(
+            title: 'Todo Sobre Mi Club - Admin',
+            debugShowCheckedModeBanner: false,
+            theme: ThemeData(useMaterial3: true),
+            home: const AdminHomeScreen(),
+          );
+        }
+
+        final session = resultado?.socio;
+
+        // ✅ Theme dinámico si hay sesión de socio
         final theme = session != null
             ? AppTheme.fromClub(session.clubObj)
             : ThemeData(useMaterial3: true);
@@ -42,4 +65,11 @@ class MyApp extends StatelessWidget {
       },
     );
   }
+}
+
+class _SesionInicial {
+  final AdminSession? admin;
+  final AppSession? socio;
+
+  _SesionInicial({this.admin, this.socio});
 }

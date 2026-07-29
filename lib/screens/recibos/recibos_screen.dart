@@ -133,7 +133,7 @@ Future<void> _loadTransferConfig() async {
 
     final bool pendienteApi = p['pendiente'] == true;
 
-    return _ReciboPago(
+return _ReciboPago(
       anio: anio,
       mes: mes,
       monto: monto,
@@ -141,6 +141,7 @@ Future<void> _loadTransferConfig() async {
       cuenta: cuenta,
       pendiente: pendienteApi,
       estadoTransferencia: p['estado_transferencia'],
+      motivoRechazo: p['motivo_rechazo'],
     );
   }).toList();
 
@@ -238,9 +239,16 @@ recibos.sort((a, b) {
     _row('Estado', 'En revisión', scheme),
   ]
 
-  // ✅ RECHAZADO (FIX NUEVO)
+// ✅ RECHAZADO (con motivo real del club)
   else if (recibo.estadoTransferencia == 'rechazado') ...[
-    _row('Estado', 'Rechazada, por favor comunicarse con el club', scheme),
+    _row('Estado', 'Rechazada', scheme),
+    if (recibo.motivoRechazo != null && recibo.motivoRechazo!.trim().isNotEmpty) ...[
+      const SizedBox(height: 4),
+      _row('Motivo', recibo.motivoRechazo!, scheme),
+    ] else ...[
+      const SizedBox(height: 4),
+      _row('Motivo', 'Por favor comunicarse con el club', scheme),
+    ],
   ]
 
   // ✅ PENDIENTE NORMAL
@@ -676,6 +684,7 @@ class _ReciboPago {
   final String? cuenta;
   final bool pendiente;
   final String? estadoTransferencia; // en_revision | rechazado
+  final String? motivoRechazo;
 
   _ReciboPago({
     required this.anio,
@@ -685,6 +694,7 @@ class _ReciboPago {
     this.cuenta,
     this.pendiente = false,
     this.estadoTransferencia,
+    this.motivoRechazo,
   });
 
   factory _ReciboPago.pendiente({

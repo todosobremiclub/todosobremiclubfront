@@ -3,12 +3,17 @@ class ApiConfig {
   /// Importante: sin "www" para evitar redirects en CORS (preflight)
   static const String baseUrl = 'https://todosobremiclub.com.ar';
 
-  /// Endpoint de login de la app
+/// Endpoint de login de la app (socios)
   static const String appLogin = '/app/login';
 
   /// URL completa del login (por si la querés usar directo)
   static String get appLoginUrl => '$baseUrl$appLogin';
 
+  /// Endpoint de login de administradores (mismo que usa la web de gestión)
+  static const String adminLogin = '/auth/login';
+
+  /// URL completa del login de administradores
+  static String get adminLoginUrl => '$baseUrl$adminLogin';
   /// Transferencias - App Socio
   static const String transferStart = '/app/payments/transfer/start';
   static const String transferProof = '/app/payments/transfer/proof';
