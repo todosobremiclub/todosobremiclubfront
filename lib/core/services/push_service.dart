@@ -81,21 +81,40 @@ static Future<void> firebaseMessagingBackgroundHandler(
   // ======================================================
   // Suscribirse a un club (TOPICS)
   // ======================================================
-  static Future<void> subscribeToClub(String clubId) async {
-    // 🔴 Firebase Web NO soporta subscribeToTopic
-    if (kIsWeb) {
-      debugPrint('[FCM] Web: subscribeToClub ignorado (club_$clubId)');
-      return;
-    }
-
-    final topic = 'club_$clubId';
-    try {
-  await _fm.subscribeToTopic(topic);
-} catch (e) {
-  debugPrint("FCM ERROR: $e");
-}
-    debugPrint('[FCM] subscribed topic=$topic');
+static Future<void> subscribeToClub(String clubId) async {
+  // 🔴 Firebase Web NO soporta subscribeToTopic
+  if (kIsWeb) {
+    debugPrint('[FCM] Web: subscribeToClub ignorado (club_$clubId)');
+    return;
   }
+
+  final topic = 'club_$clubId';
+
+  // ✅ En iOS, subscribeToTopic falla silenciosamente si el token
+  // de APNs todavía no está registrado. Esperamos a que esté listo
+  // (hasta 5 segundos) antes de intentar la suscripción.
+  if (defaultTargetPlatform == TargetPlatform.iOS) {
+    try {
+      String? apnsToken = await _fm.getAPNSToken();
+      var intentos = 0;
+      while (apnsToken == null && intentos < 10) {
+        await Future.delayed(const Duration(milliseconds: 500));
+        apnsToken = await _fm.getAPNSToken();
+        intentos++;
+      }
+      debugPrint('[FCM] APNs token listo: ${apnsToken != null} (intentos=$intentos)');
+    } catch (e) {
+      debugPrint('[FCM] Error esperando APNs token: $e');
+    }
+  }
+
+  try {
+    await _fm.subscribeToTopic(topic);
+    debugPrint('[FCM] subscribed topic=$topic');
+  } catch (e) {
+    debugPrint("FCM ERROR al suscribir a $topic: $e");
+  }
+}
 
   // ======================================================
   // Desuscribirse de un club
