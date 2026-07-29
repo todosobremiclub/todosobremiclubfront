@@ -9,6 +9,7 @@ import '../carnet/carnet_screen.dart';
 import '../noticias/noticias_screen.dart';
 import '../cumples/cumples_screen.dart';
 import '../recibos/recibos_screen.dart';
+import '../debug/push_debug_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final AppSession session;
@@ -281,7 +282,19 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ],
         ),
-        actions: [
+actions: [
+          IconButton(
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => PushDebugScreen(
+                    clubId: widget.session.clubObj.id.toString(),
+                  ),
+                ),
+              );
+            },
+            icon: const Icon(Icons.bug_report),
+          ),
           IconButton(
             onPressed: _openInstagram,
             icon: Image.asset('assets/icons/instagram.png', width: 24),

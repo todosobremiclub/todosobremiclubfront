@@ -130,4 +130,58 @@ static Future<void> subscribeToClub(String clubId) async {
     await _fm.unsubscribeFromTopic(topic);
     debugPrint('[FCM] unsubscribed topic=$topic');
   }
+
+  // ======================================================
+  // 🩺 Diagnóstico visible en pantalla (temporal, para debug)
+  // ======================================================
+  static Future<String> runDiagnostics(String clubId) async {
+    final buffer = StringBuffer();
+
+    // 1) Estado del permiso de notificaciones
+    try {
+      final settings = await _fm.getNotificationSettings();
+      buffer.writeln('Permiso: ${settings.authorizationStatus}');
+    } catch (e) {
+      buffer.writeln('Permiso: ERROR ($e)');
+    }
+
+    // 2) Token de APNs (solo iOS)
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
+      try {
+        String? apnsToken = await _fm.getAPNSToken();
+        var intentos = 0;
+        while (apnsToken == null && intentos < 10) {
+          await Future.delayed(const Duration(milliseconds: 500));
+          apnsToken = await _fm.getAPNSToken();
+          intentos++;
+        }
+        buffer.writeln(
+          'APNs token: ${apnsToken ?? "NULO"} (intentos=$intentos)',
+        );
+      } catch (e) {
+        buffer.writeln('APNs token: ERROR ($e)');
+      }
+    } else {
+      buffer.writeln('APNs token: N/A (no es iOS)');
+    }
+
+    // 3) Token de FCM
+    try {
+      final fcmToken = await _fm.getToken();
+      buffer.writeln('FCM token: ${fcmToken ?? "NULO"}');
+    } catch (e) {
+      buffer.writeln('FCM token: ERROR ($e)');
+    }
+
+    // 4) Suscripción al topic del club
+    final topic = 'club_$clubId';
+    try {
+      await _fm.subscribeToTopic(topic);
+      buffer.writeln('Suscripción a "$topic": OK');
+    } catch (e) {
+      buffer.writeln('Suscripción a "$topic": ERROR ($e)');
+    }
+
+    return buffer.toString();
+  }
 }
