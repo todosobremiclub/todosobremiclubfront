@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../core/services/storage_service.dart';
+import '../../core/config/app_theme.dart';
+import '../../models/club.dart';
 import '../../services/admin_api_service.dart';
 import '../login/login_screen.dart';
 import 'control_acceso_screen.dart';
@@ -24,6 +26,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   AdminSession? _session;
   bool _loading = true;
   String? _logoUrl;
+  Club? _club;
 
   @override
   void initState() {
@@ -46,9 +49,12 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
           clubId: session.clubId,
         );
         if (!mounted) return;
-        setState(() => _logoUrl = club['logo_url']?.toString());
+        setState(() {
+          _logoUrl = club['logo_url']?.toString();
+          _club = Club.fromJson(club);
+        });
       } catch (_) {
-        // Si falla, seguimos sin logo, no bloqueamos la pantalla
+        // Si falla, seguimos con el color por defecto, no bloqueamos la pantalla
       }
     }
   }
@@ -73,7 +79,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   // solo_lectura        -> sin acceso a la app
   // finanzas            -> pagos, ingresos, gastos
   // comunicacion        -> noticias y notificaciones
-  // profesor            -> noticias, notificaciones, buscar socio
+  // profesor            -> noticias, notificaciones, buscar socio, asistencia
   // asistencias         -> registrar asistencias
   // ======================================================
   bool _puede(List<String> rolesPermitidos) {
@@ -107,13 +113,27 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
 
     final token = _session!.token;
     final clubId = _session!.clubId;
-    final scheme = Theme.of(context).colorScheme;
 
+    // ✅ Tema con el color real del club (o el default si todavía no cargó)
+    final theme = _club != null ? AppTheme.fromClub(_club!) : Theme.of(context);
+
+    return Theme(
+      data: theme,
+      child: _buildBody(context, token, clubId, theme),
+    );
+  }
+
+  Widget _buildBody(
+    BuildContext context,
+    String token,
+    String clubId,
+    ThemeData theme,
+  ) {
     // 🔒 solo_lectura no tiene acceso a ninguna acción de la app
     if (_session!.role == 'solo_lectura') {
       return Scaffold(
         backgroundColor: Colors.white,
-        appBar: _buildAppBar(),
+        appBar: _buildAppBar(theme),
         body: const Center(
           child: Padding(
             padding: EdgeInsets.all(24),
@@ -192,7 +212,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         titulo: 'Actividad',
         color: Colors.deepOrange,
         acciones: [
-_AccionAdmin(
+          _AccionAdmin(
             titulo: 'Registrar asistencia',
             icono: Icons.fact_check_outlined,
             visible: _puede(['admin', 'asistencias', 'profesor']),
@@ -220,7 +240,7 @@ _AccionAdmin(
 
     return Scaffold(
       backgroundColor: const Color(0xFFF6F7F9),
-      appBar: _buildAppBar(),
+      appBar: _buildAppBar(theme),
       body: seccionesVisibles.isEmpty
           ? const Center(
               child: Text(
@@ -229,39 +249,40 @@ _AccionAdmin(
               ),
             )
           : ListView(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 16),
               children: [
-                _buildSesionCard(),
-                const SizedBox(height: 20),
+                _buildSesionCard(theme),
+                const SizedBox(height: 14),
                 for (final seccion in seccionesVisibles) ...[
                   _buildTituloSeccion(seccion.titulo, seccion.color),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 8),
                   GridView.count(
                     crossAxisCount: 2,
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
-                    mainAxisSpacing: 12,
-                    crossAxisSpacing: 12,
-                    childAspectRatio: 1.05,
+                    mainAxisSpacing: 10,
+                    crossAxisSpacing: 10,
+                    childAspectRatio: 1.25,
                     children: seccion.acciones
                         .map((a) => _BotonAccion(accion: a, colorSeccion: seccion.color))
                         .toList(),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 16),
                 ],
               ],
             ),
     );
   }
 
-  PreferredSizeWidget _buildAppBar() {
+  PreferredSizeWidget _buildAppBar(ThemeData theme) {
     return AppBar(
-      backgroundColor: Theme.of(context).colorScheme.primary,
+      backgroundColor: theme.colorScheme.primary,
+      foregroundColor: theme.colorScheme.onPrimary,
       title: Row(
         children: [
           if (_logoUrl != null && _logoUrl!.isNotEmpty) ...[
             CircleAvatar(
-              radius: 16,
+              radius: 15,
               backgroundColor: Colors.white,
               backgroundImage: NetworkImage(_logoUrl!),
             ),
@@ -271,7 +292,10 @@ _AccionAdmin(
             child: Text(
               _session!.clubName,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontWeight: FontWeight.w700),
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                color: theme.colorScheme.onPrimary,
+              ),
             ),
           ),
         ],
@@ -279,36 +303,36 @@ _AccionAdmin(
       actions: [
         IconButton(
           onPressed: _logout,
-          icon: const Icon(Icons.logout),
+          icon: Icon(Icons.logout, color: theme.colorScheme.onPrimary),
           tooltip: 'Cerrar sesión',
         ),
       ],
     );
   }
 
-  Widget _buildSesionCard() {
+  Widget _buildSesionCard(ThemeData theme) {
     final roleLabel = _roleLabels[_session!.role] ?? _session!.role;
-    final scheme = Theme.of(context).colorScheme;
+    final primary = theme.colorScheme.primary;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: Colors.black.withOpacity(0.06)),
       ),
       child: Row(
         children: [
           Container(
-            width: 40,
-            height: 40,
+            width: 34,
+            height: 34,
             decoration: BoxDecoration(
-              color: scheme.primary.withOpacity(0.1),
+              color: primary.withOpacity(0.1),
               shape: BoxShape.circle,
             ),
-            child: Icon(Icons.person_outline, color: scheme.primary, size: 22),
+            child: Icon(Icons.person_outline, color: primary, size: 18),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -317,17 +341,16 @@ _AccionAdmin(
                   _session!.email,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    fontSize: 13,
+                    fontSize: 12.5,
                     fontWeight: FontWeight.w600,
                     color: Colors.black87,
                   ),
                 ),
-                const SizedBox(height: 2),
                 Text(
                   roleLabel,
                   style: TextStyle(
-                    fontSize: 12,
-                    color: scheme.primary,
+                    fontSize: 11.5,
+                    color: primary,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -344,7 +367,7 @@ _AccionAdmin(
       children: [
         Container(
           width: 4,
-          height: 16,
+          height: 14,
           decoration: BoxDecoration(
             color: color,
             borderRadius: BorderRadius.circular(2),
@@ -354,7 +377,7 @@ _AccionAdmin(
         Text(
           titulo,
           style: const TextStyle(
-            fontSize: 15,
+            fontSize: 14,
             fontWeight: FontWeight.w700,
             color: Colors.black87,
           ),
@@ -400,36 +423,36 @@ class _BotonAccion extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       color: Colors.white,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(14),
       child: InkWell(
         onTap: accion.onTap,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         child: Container(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(14),
             border: Border.all(color: Colors.black.withOpacity(0.06)),
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
-                width: 46,
-                height: 46,
+                width: 38,
+                height: 38,
                 decoration: BoxDecoration(
                   color: colorSeccion.withOpacity(0.12),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(accion.icono, size: 22, color: colorSeccion),
+                child: Icon(accion.icono, size: 19, color: colorSeccion),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 6),
               Text(
                 accion.titulo,
                 textAlign: TextAlign.center,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
-                  fontSize: 12.5,
+                  fontSize: 12,
                   fontWeight: FontWeight.w600,
                   color: Colors.black87,
                 ),

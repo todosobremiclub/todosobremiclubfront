@@ -1,13 +1,12 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
-import 'dart:io';
-import 'package:path_provider/path_provider.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
-
 
 import '../../core/config/api_config.dart';
 import '../../core/services/storage_service.dart';
@@ -26,12 +25,12 @@ class _RecibosScreenState extends State<RecibosScreen>
   bool _transferBusy = false;
   bool _transferenciaHabilitada = false;
 
-@override
-void initState() {
-  super.initState();
-  WidgetsBinding.instance.addObserver(this);
-  _reloadScreen();
-}
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _reloadScreen();
+  }
 
   @override
   void dispose() {
@@ -39,121 +38,109 @@ void initState() {
     super.dispose();
   }
 
-void _reloadScreen() {
-  _future = _loadRecibos();
-  _loadTransferConfig();
-}
+  void _reloadScreen() {
+    _future = _loadRecibos();
+    _loadTransferConfig();
+  }
 
   @override
-void didChangeAppLifecycleState(AppLifecycleState state) {
-  if (state == AppLifecycleState.resumed) {
-    setState(() {
-      _reloadScreen();
-    });
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      setState(() {
+        _reloadScreen();
+      });
+    }
   }
-}
 
+  Future<void> _loadTransferConfig() async {
+    try {
+      final token = widget.session.token;
 
-Future<void> _loadTransferConfig() async {
-  try {
+      final res = await http.get(
+        Uri.parse(ApiConfig.transferConfigUrl),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      final data = jsonDecode(res.body);
+
+      if (res.statusCode == 200 && data['ok'] == true) {
+        setState(() {
+          _transferenciaHabilitada = data['transferencia_habilitada'] == true;
+        });
+      }
+    } catch (_) {
+      // si falla, seguimos sin habilitar transferencia
+    }
+  }
+
+  Future<List<_ReciboPago>> _loadRecibos() async {
+    final clubId = widget.session.clubObj.id;
+    final socioId = widget.session.socioObj.id;
     final token = widget.session.token;
+    final anioActual = DateTime.now().year;
+
+    final url = Uri.parse(
+      '${ApiConfig.baseUrl}/club/$clubId/pagos/$socioId?anio=$anioActual',
+    );
 
     final res = await http.get(
-      Uri.parse(ApiConfig.transferConfigUrl),
+      url,
       headers: {
         'Authorization': 'Bearer $token',
         'Content-Type': 'application/json',
       },
     );
 
+    if (res.statusCode != 200) {
+      throw Exception('Error al obtener recibos de pago');
+    }
+
     final data = jsonDecode(res.body);
 
-    if (res.statusCode == 200 && data['ok'] == true) {
-      setState(() {
-        _transferenciaHabilitada =
-            data['transferencia_habilitada'] == true;
-      });
-
-      print('✅ CONFIG transferencia: $_transferenciaHabilitada');
-    } else {
-      print('❌ config error: ${data['error']}');
+    if (data['ok'] != true) {
+      throw Exception(data['error'] ?? 'Error al obtener recibos de pago');
     }
-  } catch (e) {
-    print('❌ error cargando config: $e');
+
+    final int anio = data['anio'] is int
+        ? data['anio'] as int
+        : int.tryParse('${data['anio']}') ?? anioActual;
+
+    final List<dynamic> pagosRaw = data['pagos'] ?? [];
+
+    final recibos = pagosRaw.map<_ReciboPago>((p) {
+      final mes = int.tryParse('${p['mes']}') ?? 0;
+
+      final monto = p['monto'] == null
+          ? 0.0
+          : double.tryParse(p['monto'].toString()) ?? 0.0;
+
+      final fechaIso = (p['fecha_pago'] ?? p['fecha'] ?? '') as String;
+      final cuenta = (p['cuenta'] ?? '').toString();
+      final bool pendienteApi = p['pendiente'] == true;
+
+      return _ReciboPago(
+        anio: anio,
+        mes: mes,
+        monto: monto,
+        fechaPagoIso: fechaIso,
+        cuenta: cuenta,
+        pendiente: pendienteApi,
+        estadoTransferencia: p['estado_transferencia'],
+        motivoRechazo: p['motivo_rechazo'],
+      );
+    }).toList();
+
+    recibos.sort((a, b) {
+      final ka = a.anio * 100 + a.mes;
+      final kb = b.anio * 100 + b.mes;
+      return kb.compareTo(ka);
+    });
+
+    return recibos;
   }
-}
-
-  Future<List<_ReciboPago>> _loadRecibos() async {
-  final clubId = widget.session.clubObj.id;
-  final socioId = widget.session.socioObj.id;
-  final token = widget.session.token;
-  final anioActual = DateTime.now().year;
-
-  final url = Uri.parse(
-    '${ApiConfig.baseUrl}/club/$clubId/pagos/$socioId?anio=$anioActual',
-  );
-
-  final res = await http.get(
-    url,
-    headers: {
-      'Authorization': 'Bearer $token',
-      'Content-Type': 'application/json',
-    },
-  );
-
-  if (res.statusCode != 200) {
-    throw Exception('Error al obtener recibos de pago');
-  }
-
-  final data = jsonDecode(res.body);
-
-  if (data['ok'] != true) {
-    throw Exception(data['error'] ?? 'Error al obtener recibos de pago');
-  }
-
-  // 🚫 IMPORTANTE: NO tocar más _transferenciaHabilitada acá
-  // Este valor ahora SOLO lo maneja _loadTransferConfig()
-
-  final int anio = data['anio'] is int
-      ? data['anio'] as int
-      : int.tryParse('${data['anio']}') ?? anioActual;
-
-  final List<dynamic> pagosRaw = data['pagos'] ?? [];
-
-  final recibos = pagosRaw.map<_ReciboPago>((p) {
-    final mes = int.tryParse('${p['mes']}') ?? 0;
-
-    final monto = p['monto'] == null
-        ? 0.0
-        : double.tryParse(p['monto'].toString()) ?? 0.0;
-
-    final fechaIso = (p['fecha_pago'] ?? p['fecha'] ?? '') as String;
-
-    final cuenta = (p['cuenta'] ?? '').toString();
-
-    final bool pendienteApi = p['pendiente'] == true;
-
-return _ReciboPago(
-      anio: anio,
-      mes: mes,
-      monto: monto,
-      fechaPagoIso: fechaIso,
-      cuenta: cuenta,
-      pendiente: pendienteApi,
-      estadoTransferencia: p['estado_transferencia'],
-      motivoRechazo: p['motivo_rechazo'],
-    );
-  }).toList();
-
-// ✅ ORDENAR: mes actual primero, hacia atrás
-recibos.sort((a, b) {
-  final ka = a.anio * 100 + a.mes;
-  final kb = b.anio * 100 + b.mes;
-  return kb.compareTo(ka); // DESCENDENTE
-});
-
-  return recibos;
-}
 
   @override
   Widget build(BuildContext context) {
@@ -191,25 +178,20 @@ recibos.sort((a, b) {
           padding: const EdgeInsets.all(12),
           itemCount: recibos.length,
           itemBuilder: (context, index) {
-            return _buildReciboCard(
-              context,
-              club,
-              recibos[index],
-            );
+            return _buildReciboCard(context, club, recibos[index]);
           },
         );
       },
     );
   }
 
-Widget _buildReciboCard(
+  Widget _buildReciboCard(
     BuildContext context,
     dynamic club,
     _ReciboPago recibo,
   ) {
     final scheme = Theme.of(context).colorScheme;
 
-    // Determinar color/etiqueta de estado para la franja lateral y el badge
     Color colorEstado;
     String labelEstado;
 
@@ -298,10 +280,8 @@ Widget _buildReciboCard(
                         ),
                       ],
                     ),
-
                     if (recibo.pendiente && _transferenciaHabilitada == true) ...[
                       const SizedBox(height: 10),
-
                       if (recibo.estadoTransferencia == 'rechazado') ...[
                         Container(
                           width: double.infinity,
@@ -310,15 +290,30 @@ Widget _buildReciboCard(
                             color: Colors.redAccent.withOpacity(0.08),
                             borderRadius: BorderRadius.circular(10),
                           ),
-                          child: Text(
-                            (recibo.motivoRechazo != null &&
-                                    recibo.motivoRechazo!.trim().isNotEmpty)
-                                ? recibo.motivoRechazo!
-                                : 'Por favor comunicarse con el club',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Colors.redAccent.shade700,
-                            ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                (recibo.motivoRechazo != null &&
+                                        recibo.motivoRechazo!.trim().isNotEmpty)
+                                    ? recibo.motivoRechazo!
+                                    : 'Por favor comunicarse con el club',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.redAccent.shade700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton(
+                            onPressed: _transferBusy
+                                ? null
+                                : () => _openTransferDialog(recibo),
+                            child: const Text('Volver a informar'),
                           ),
                         ),
                       ] else if (recibo.estadoTransferencia == 'en_revision') ...[
@@ -392,6 +387,9 @@ Widget _buildReciboCard(
     );
   }
 
+  // ======================================================
+  // PASO 1: mostrar datos de la cuenta del club (solo lectura)
+  // ======================================================
   Future<void> _openTransferDialog(_ReciboPago recibo) async {
     if (_transferBusy) return;
     if (!mounted) return;
@@ -409,10 +407,7 @@ Widget _buildReciboCard(
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
         },
-        body: jsonEncode({
-          'anio': recibo.anio,
-          'mes': recibo.mes,
-        }),
+        body: jsonEncode({'anio': recibo.anio, 'mes': recibo.mes}),
       );
 
       if (startRes.statusCode != 200) {
@@ -426,13 +421,17 @@ Widget _buildReciboCard(
         return;
       }
 
-      // Si backend dice que ya está en revisión, no permitir otro intento
       if (startData['estado'] == 'en_revision') {
         _showSnack('Ya está en revisión');
         return;
       }
 
-      // 2) CONFIG
+      final conceptosDisponibles = (startData['conceptosDisponibles'] as List?)
+              ?.map((c) => Map<String, dynamic>.from(c))
+              .toList() ??
+          <Map<String, dynamic>>[];
+
+      // 2) CONFIG (CVU/alias/titular)
       final cfgRes = await http.get(
         Uri.parse(ApiConfig.transferConfigUrl),
         headers: {
@@ -456,19 +455,15 @@ Widget _buildReciboCard(
       final cvu = (cfgData['cvu'] ?? '').toString();
       final titular = (cfgData['titular'] ?? '').toString();
 
-      final controller = TextEditingController();
-
       if (!mounted) return;
 
       await showDialog(
-  context: context,
-  barrierDismissible: false,
-  builder: (dialogContext) => AlertDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) => AlertDialog(
           backgroundColor: Colors.white,
           insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
           title: Text(
             'Datos para la transferencia',
             style: TextStyle(
@@ -492,129 +487,52 @@ Widget _buildReciboCard(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-  'Transferí a esta cuenta',
-  style: const TextStyle(
-    color: Colors.black,
-    fontWeight: FontWeight.w800,
-    fontSize: 17,
-  ),
-),
+                      const Text(
+                        'Transferí a esta cuenta',
+                        style: TextStyle(
+                          color: Colors.black,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 17,
+                        ),
+                      ),
                       const SizedBox(height: 12),
                       _datoTransferencia(
                         label: 'Alias',
                         value: alias,
-                        onCopy: () {
-                          Clipboard.setData(ClipboardData(text: alias));
-                          _showSnack('Alias copiado');
-                        },
+                        onCopy: () => _copiar(alias, 'Alias copiado'),
                       ),
                       const SizedBox(height: 10),
                       _datoTransferencia(
                         label: 'CVU',
                         value: cvu,
-                        onCopy: () {
-                          Clipboard.setData(ClipboardData(text: cvu));
-                          _showSnack('CVU copiado');
-                        },
+                        onCopy: () => _copiar(cvu, 'CVU copiado'),
                       ),
                       const SizedBox(height: 10),
-                      _datoTransferencia(
-                        label: 'Titular',
-                        value: titular,
-                        onCopy: null,
-                      ),
+                      _datoTransferencia(label: 'Titular', value: titular, onCopy: null),
                     ],
                   ),
                 ),
-                const SizedBox(height: 16),
-                Text(
-                  'Indique desde que cuenta se realiza la transferencia',
-                  style: TextStyle(
-                    color: scheme.onSurface,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                TextField(
-  controller: controller,
-  maxLines: 2,
-  style: const TextStyle(color: Colors.black),
-  decoration: InputDecoration(
-    hintText: 'Ej: Juan Pérez, cuenta propia, etc.',
-    hintStyle: TextStyle(color: Colors.grey.shade600),
-
-    filled: true,
-    fillColor: Colors.white,
-
-    border: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(10),
-      borderSide: const BorderSide(
-        color: Colors.black,
-        width: 1,
-      ),
-    ),
-
-    enabledBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(10),
-      borderSide: BorderSide(
-        color: Colors.grey.shade500,
-        width: 1.2,
-      ),
-    ),
-
-    focusedBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(10),
-      borderSide: BorderSide(
-        color: Theme.of(context).primaryColor,
-        width: 2,
-      ),
-    ),
-
-    contentPadding: const EdgeInsets.symmetric(
-      horizontal: 12,
-      vertical: 10,
-    ),
-  ),
-),
-
               ],
             ),
           ),
           actions: [
             TextButton(
-  onPressed: () {
-    if (dialogContext.mounted) {
-      Navigator.of(dialogContext, rootNavigator: true).pop();
-    }
-  },
-  child: const Text('Cancelar'),
-),
+              onPressed: () {
+                if (dialogContext.mounted) {
+                  Navigator.of(dialogContext, rootNavigator: true).pop();
+                }
+              },
+              child: const Text('Cancelar'),
+            ),
             ElevatedButton(
-  onPressed: () async {
-    final ok = await _sendTransferProof(
-      anio: recibo.anio,
-      mes: recibo.mes,
-      comprobanteTexto: controller.text.trim(),
-    );
-
-    if (!ok) return;
-
-    // Cerrar primero el diálogo usando SU PROPIO contexto
-    if (dialogContext.mounted) {
-      Navigator.of(dialogContext, rootNavigator: true).pop();
-    }
-
-    // Verificar que la pantalla siga viva antes de usar context o setState
-    if (!mounted) return;
-
-    _showSnack('Pago enviado para revisión');
-    setState(() {
-      _future = _loadRecibos();
-    });
-  },
-  child: const Text('Ya transferí'),
-),
+              onPressed: () {
+                if (dialogContext.mounted) {
+                  Navigator.of(dialogContext, rootNavigator: true).pop();
+                }
+                _openInformarPagoDialog(recibo, conceptosDisponibles);
+              },
+              child: const Text('Ya transferí'),
+            ),
           ],
         ),
       );
@@ -623,10 +541,223 @@ Widget _buildReciboCard(
     }
   }
 
+  void _copiar(String value, String msg) {
+    // ignore: deprecated_member_use
+    Clipboard.setData(ClipboardData(text: value));
+    _showSnack(msg);
+  }
+
+  // ======================================================
+  // PASO 2: formulario de "Ya transferí"
+  // ======================================================
+  Future<void> _openInformarPagoDialog(
+    _ReciboPago recibo,
+    List<Map<String, dynamic>> conceptosDisponibles,
+  ) async {
+    final cuentaController = TextEditingController();
+    final comentarioController = TextEditingController();
+
+    // Por defecto, todos los conceptos vienen tildados (pago completo)
+    bool pagarBase = conceptosDisponibles.any((c) => c['tipo'] == 'base');
+    final adicionalesSeleccionados = <String>{
+      for (final c in conceptosDisponibles)
+        if (c['tipo'] == 'adicional') c['nombre'].toString(),
+    };
+
+    File? foto;
+    bool enviando = false;
+
+    if (!mounted) return;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            Future<void> elegirFoto() async {
+              final origen = await showModalBottomSheet<ImageSource>(
+                context: context,
+                builder: (context) => SafeArea(
+                  child: Wrap(
+                    children: [
+                      ListTile(
+                        leading: const Icon(Icons.photo_camera),
+                        title: const Text('Sacar foto'),
+                        onTap: () => Navigator.of(context).pop(ImageSource.camera),
+                      ),
+                      ListTile(
+                        leading: const Icon(Icons.photo_library),
+                        title: const Text('Elegir de la galería'),
+                        onTap: () => Navigator.of(context).pop(ImageSource.gallery),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+              if (origen == null) return;
+
+              final picker = ImagePicker();
+              final XFile? file =
+                  await picker.pickImage(source: origen, imageQuality: 70);
+              if (file != null) {
+                setDialogState(() => foto = File(file.path));
+              }
+            }
+
+            Future<void> enviar() async {
+              if (!pagarBase && adicionalesSeleccionados.isEmpty) {
+                _showSnack('Seleccioná al menos un concepto que estés pagando');
+                return;
+              }
+              if (cuentaController.text.trim().isEmpty) {
+                _showSnack('Indicá la cuenta desde la que transferiste');
+                return;
+              }
+
+              setDialogState(() => enviando = true);
+
+              String? fotoBase64;
+              if (foto != null) {
+                final bytes = await foto!.readAsBytes();
+                fotoBase64 = base64Encode(bytes);
+              }
+
+              final ok = await _sendTransferProof(
+                anio: recibo.anio,
+                mes: recibo.mes,
+                cuentaOrigen: cuentaController.text.trim(),
+                comentario: comentarioController.text.trim(),
+                pagarBase: pagarBase,
+                adicionalesAPagar: adicionalesSeleccionados.toList(),
+                comprobanteBase64: fotoBase64,
+              );
+
+              if (!ok) {
+                setDialogState(() => enviando = false);
+                return;
+              }
+
+              if (dialogContext.mounted) {
+                Navigator.of(dialogContext, rootNavigator: true).pop();
+              }
+              if (!mounted) return;
+
+              _showSnack('Pago enviado para revisión');
+              setState(() => _future = _loadRecibos());
+            }
+
+            return AlertDialog(
+              backgroundColor: Colors.white,
+              insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+              title: const Text(
+                '¿Qué estás pagando?',
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 19),
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (final c in conceptosDisponibles)
+                      CheckboxListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text('${c['nombre']}'),
+                        subtitle: Text('\$${(c['monto'] as num).toStringAsFixed(0)}'),
+                        value: c['tipo'] == 'base'
+                            ? pagarBase
+                            : adicionalesSeleccionados.contains(c['nombre']),
+                        onChanged: (v) {
+                          setDialogState(() {
+                            if (c['tipo'] == 'base') {
+                              pagarBase = v ?? false;
+                            } else {
+                              final nombre = c['nombre'].toString();
+                              if (v == true) {
+                                adicionalesSeleccionados.add(nombre);
+                              } else {
+                                adicionalesSeleccionados.remove(nombre);
+                              }
+                            }
+                          });
+                        },
+                      ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: cuentaController,
+                      style: const TextStyle(color: Colors.black),
+                      decoration: InputDecoration(
+                        labelText: 'Cuenta desde la que transferiste *',
+                        hintText: 'Ej: Juan Pérez, cuenta propia',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: comentarioController,
+                      maxLines: 2,
+                      style: const TextStyle(color: Colors.black),
+                      decoration: InputDecoration(
+                        labelText: 'Comentario (opcional)',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    if (foto != null) ...[
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.file(foto!, height: 120, fit: BoxFit.cover),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                    OutlinedButton.icon(
+                      onPressed: enviando ? null : elegirFoto,
+                      icon: const Icon(Icons.attach_file),
+                      label: Text(foto == null
+                          ? 'Adjuntar comprobante (opcional)'
+                          : 'Cambiar comprobante'),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: enviando
+                      ? null
+                      : () {
+                          if (dialogContext.mounted) {
+                            Navigator.of(dialogContext, rootNavigator: true).pop();
+                          }
+                        },
+                  child: const Text('Cancelar'),
+                ),
+                ElevatedButton(
+                  onPressed: enviando ? null : enviar,
+                  child: enviando
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Enviar'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   Future<bool> _sendTransferProof({
     required int anio,
     required int mes,
-    String? comprobanteTexto,
+    required String cuentaOrigen,
+    required String comentario,
+    required bool pagarBase,
+    required List<String> adicionalesAPagar,
+    String? comprobanteBase64,
   }) async {
     final token = widget.session.token;
 
@@ -639,21 +770,23 @@ Widget _buildReciboCard(
       body: jsonEncode({
         'anio': anio,
         'mes': mes,
-        if (comprobanteTexto != null && comprobanteTexto.isNotEmpty)
-          'comprobante_texto': comprobanteTexto,
-        if (comprobanteTexto == null || comprobanteTexto.isEmpty)
-          'comprobante_texto': 'Transferencia realizada',
+        'cuentaOrigen': cuentaOrigen,
+        if (comentario.isNotEmpty) 'comentario': comentario,
+        'pagarBase': pagarBase,
+        'adicionalesAPagar': adicionalesAPagar,
+        if (comprobanteBase64 != null) 'comprobante_base64': comprobanteBase64,
+        if (comprobanteBase64 != null) 'comprobante_mimetype': 'image/jpeg',
       }),
     );
 
     if (proofRes.statusCode != 200) {
-      _showSnack('Error enviando comprobante (HTTP ${proofRes.statusCode})');
+      _showSnack('Error enviando el pago (HTTP ${proofRes.statusCode})');
       return false;
     }
 
     final proofData = jsonDecode(proofRes.body);
     if (proofData is! Map || proofData['ok'] != true) {
-      _showSnack(proofData['error']?.toString() ?? 'Error enviando comprobante');
+      _showSnack(proofData['error']?.toString() ?? 'Error enviando el pago');
       return false;
     }
 
@@ -662,59 +795,48 @@ Widget _buildReciboCard(
 
   void _showSnack(String msg) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg)),
-    );
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
-Future<void> _descargarPdfRecibo(_ReciboPago recibo, dynamic club) async {
-  try {
-    final pdf = pw.Document();
+  Future<void> _descargarPdfRecibo(_ReciboPago recibo, dynamic club) async {
+    try {
+      final pdf = pw.Document();
 
-    pdf.addPage(
-      pw.Page(
-        build: (context) => pw.Padding(
-          padding: const pw.EdgeInsets.all(24),
-          child: pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              pw.Text(
-                club.nombre,
-                style: pw.TextStyle(
-                  fontSize: 20,
-                  fontWeight: pw.FontWeight.bold,
+      pdf.addPage(
+        pw.Page(
+          build: (context) => pw.Padding(
+            padding: const pw.EdgeInsets.all(24),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(
+                  club.nombre,
+                  style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold),
                 ),
-              ),
-              pw.SizedBox(height: 20),
-
-pw.Text("Recibo de pago"),
-pw.SizedBox(height: 12),
-
-pw.Divider(),
-pw.SizedBox(height: 12),
-
-              pw.Text("Socio: ${widget.session.socioObj.nombre}"),
-              pw.Text("Mes: ${recibo.mesNombreConAnio}"),
-              pw.Text("Fecha: ${recibo.fechaPagoDMY}"),
-              pw.Text("Monto: ${recibo.montoFormatoArs}"),
-              pw.Text("Método: ${recibo.metodoPagoLabel}"),
-            ],
+                pw.SizedBox(height: 20),
+                pw.Text("Recibo de pago"),
+                pw.SizedBox(height: 12),
+                pw.Divider(),
+                pw.SizedBox(height: 12),
+                pw.Text("Socio: ${widget.session.socioObj.nombre}"),
+                pw.Text("Mes: ${recibo.mesNombreConAnio}"),
+                pw.Text("Fecha: ${recibo.fechaPagoDMY}"),
+                pw.Text("Monto: ${recibo.montoFormatoArs}"),
+                pw.Text("Método: ${recibo.metodoPagoLabel}"),
+              ],
+            ),
           ),
         ),
-      ),
-    );
+      );
 
-final bytes = await pdf.save();
+      final bytes = await pdf.save();
+      await Printing.layoutPdf(onLayout: (format) async => bytes);
 
-await Printing.layoutPdf(
-  onLayout: (format) async => bytes,
-);
-
-    _showSnack("PDF generado correctamente");
-  } catch (e) {
-    _showSnack("Error al generar PDF: $e");
+      _showSnack("PDF generado correctamente");
+    } catch (e) {
+      _showSnack("Error al generar PDF: $e");
+    }
   }
-}
 
   Widget _datoTransferencia({
     required String label,
@@ -731,19 +853,19 @@ await Printing.layoutPdf(
               Text(
                 label,
                 style: const TextStyle(
-  color: Colors.black,
-  fontSize: 13,
-  fontWeight: FontWeight.w700,
-),
+                  color: Colors.black,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
               const SizedBox(height: 4),
               SelectableText(
                 value.isNotEmpty ? value : '—',
                 style: const TextStyle(
-  color: Colors.black,
-  fontSize: 15,
-  fontWeight: FontWeight.w500,
-),
+                  color: Colors.black,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ],
           ),
@@ -765,7 +887,7 @@ class _ReciboPago {
   final String fechaPagoIso;
   final String? cuenta;
   final bool pendiente;
-  final String? estadoTransferencia; // en_revision | rechazado
+  final String? estadoTransferencia;
   final String? motivoRechazo;
 
   _ReciboPago({
@@ -779,41 +901,15 @@ class _ReciboPago {
     this.motivoRechazo,
   });
 
-  factory _ReciboPago.pendiente({
-    required int anio,
-    required int mes,
-  }) {
-    return _ReciboPago(
-      anio: anio,
-      mes: mes,
-      monto: 0,
-      fechaPagoIso: '',
-      pendiente: true,
-      estadoTransferencia: null,
-    );
-  }
-
   static const List<String> _meses = [
-    '',
-    'Enero',
-    'Febrero',
-    'Marzo',
-    'Abril',
-    'Mayo',
-    'Junio',
-    'Julio',
-    'Agosto',
-    'Septiembre',
-    'Octubre',
-    'Noviembre',
-    'Diciembre',
+    '', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
   ];
 
   static final NumberFormat _ars =
       NumberFormat.currency(locale: 'es_AR', symbol: '\$ ');
 
-  String get mesNombre =>
-      (mes >= 1 && mes <= 12) ? _meses[mes] : 'Mes $mes';
+  String get mesNombre => (mes >= 1 && mes <= 12) ? _meses[mes] : 'Mes $mes';
 
   String get mesNombreConAnio => '$mesNombre $anio';
 
@@ -833,7 +929,6 @@ class _ReciboPago {
       if (estadoTransferencia == 'rechazado') return 'Rechazado';
       return 'Pendiente';
     }
-
     return cuenta?.isNotEmpty == true ? cuenta! : '—';
   }
 }
