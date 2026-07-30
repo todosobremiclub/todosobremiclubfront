@@ -19,7 +19,8 @@ class NoticiasScreen extends StatefulWidget {
   State<NoticiasScreen> createState() => _NoticiasScreenState();
 }
 
-class _NoticiasScreenState extends State<NoticiasScreen> {
+class _NoticiasScreenState extends State<NoticiasScreen>
+    with SingleTickerProviderStateMixin {
   static const String _kNoticiasLeidas = 'app_noticias_leidas';
 
   final _service = NoticiasService();
@@ -27,11 +28,31 @@ class _NoticiasScreenState extends State<NoticiasScreen> {
   int _pageIndex = 0;
   Set<String> _leidas = <String>{};
 
+  bool _mostrarPistaSwipe = true;
+  late final AnimationController _pistaController;
+
   @override
   void initState() {
     super.initState();
     _future = _loadNoticiasViewData();
+    _pistaController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat(reverse: true);
+
+    // La pista se oculta sola a los 4 segundos, o antes si el usuario
+    // ya cambió de página (ver onPageChanged más abajo).
+    Future.delayed(const Duration(seconds: 4), () {
+      if (mounted) setState(() => _mostrarPistaSwipe = false);
+    });
   }
+
+  @override
+  void dispose() {
+    _pistaController.dispose();
+    super.dispose();
+  }
+
 
   Future<_NoticiasViewData> _loadNoticiasViewData() async {
   final noticias = await _service.getNoticias(
@@ -282,18 +303,8 @@ class _NoticiasScreenState extends State<NoticiasScreen> {
                                       const SizedBox(height: 10),
 
 Row(
-  crossAxisAlignment: CrossAxisAlignment.center, // ✅ misma altura
+  crossAxisAlignment: CrossAxisAlignment.center,
   children: [
-    if (fechaLinda.isNotEmpty)
-      Text(
-        fechaLinda,
-        style: const TextStyle(
-          fontSize: 13,             // ✅ mismo tamaño
-          color: Colors.black45,    // ✅ mismo color
-          fontStyle: FontStyle.italic,
-        ),
-      ),
-    const Spacer(),
     const Text(
       'Tocar para abrir',
       style: TextStyle(
@@ -302,8 +313,18 @@ Row(
         fontStyle: FontStyle.italic,
       ),
     ),
+    const Spacer(),
+    if (fechaLinda.isNotEmpty)
+      Text(
+        fechaLinda,
+        style: TextStyle(
+          fontSize: 11,
+          color: Colors.grey.shade500,
+        ),
+      ),
   ],
 ),
+
                                     ], // ✅ cierra Column interno
                                   ), // ✅ cierra Column
                                 ), // ✅ cierra Padding
@@ -335,19 +356,59 @@ Row(
                         Expanded(
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(20),
-                            child: PageCurlView(
-                              children: pages,
-                              radius: 0.08,
-                              shadowWidth: 0.16,
-                              backOpacity: 0.55,
-                              edgeZoneWidth: 0.22,
-                              animationDuration:
-                                  const Duration(milliseconds: 450),
-                              animationCurve: Curves.easeOutCubic,
-                              onPageChanged: (page) async {
-                                if (!mounted) return;
-                                setState(() => _pageIndex = page);
-                                                              },
+                            child: Stack(
+                              children: [
+                                PageCurlView(
+                                  children: pages,
+                                  radius: 0.08,
+                                  shadowWidth: 0.16,
+                                  backOpacity: 0.55,
+                                  edgeZoneWidth: 0.38,
+                                  animationDuration:
+                                      const Duration(milliseconds: 450),
+                                  animationCurve: Curves.easeOutCubic,
+                                  onPageChanged: (page) async {
+                                    if (!mounted) return;
+                                    setState(() {
+                                      _pageIndex = page;
+                                      _mostrarPistaSwipe = false;
+                                    });
+                                  },
+                                ),
+                                if (_mostrarPistaSwipe && noticias.length > 1)
+                                  Positioned(
+                                    right: 6,
+                                    top: 0,
+                                    bottom: 0,
+                                    child: IgnorePointer(
+                                      child: Center(
+                                        child: AnimatedBuilder(
+                                          animation: _pistaController,
+                                          builder: (context, child) {
+                                            final dx =
+                                                _pistaController.value * 8;
+                                            return Transform.translate(
+                                              offset: Offset(-dx, 0),
+                                              child: Opacity(
+                                                opacity:
+                                                    0.35 +
+                                                        (_pistaController
+                                                                .value *
+                                                            0.3),
+                                                child: child,
+                                              ),
+                                            );
+                                          },
+                                          child: const Icon(
+                                            Icons.chevron_left,
+                                            size: 34,
+                                            color: Colors.black45,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                              ],
                             ),
                           ),
                         ),

@@ -85,6 +85,15 @@ class _CarnetScreenState extends State<CarnetScreen> {
     );
   }
 
+  /// Oscurece un color (para el segundo punto del degradé de la tarjeta)
+  Color _darken(Color color, [double amount = 0.35]) {
+    final hsl = HSLColor.fromColor(color);
+    final hslDark = hsl.withLightness(
+      (hsl.lightness - amount).clamp(0.0, 1.0),
+    );
+    return hslDark.toColor();
+  }
+
   @override
   Widget build(BuildContext context) {
     final socio = widget.session.socioObj;
@@ -97,7 +106,7 @@ class _CarnetScreenState extends State<CarnetScreen> {
             : socio.ultimoPago!;
     final ultimoPago = DateUtilsApp.isoToMesAnio(ultimoPagoRaw);
 
-final alDia = socio.alDia == true;
+    final alDia = socio.alDia == true;
 
     final qrData = jsonEncode({
       'clubId': club.id,
@@ -154,66 +163,73 @@ final alDia = socio.alDia == true;
                     child: Container(
                       width: cardWidth,
                       decoration: BoxDecoration(
-                        color: scheme.primary,
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            scheme.primary,
+                            _darken(scheme.primary, 0.30),
+                          ],
+                        ),
                         borderRadius: BorderRadius.circular(22),
-                        boxShadow: const [
+                        boxShadow: [
                           BoxShadow(
-                            color: Colors.black26,
-                            blurRadius: 10,
-                            offset: Offset(0, 4),
+                            color: scheme.primary.withOpacity(0.35),
+                            blurRadius: 24,
+                            offset: const Offset(0, 10),
                           ),
                         ],
                       ),
-                      padding: const EdgeInsets.all(14),
+                      padding: const EdgeInsets.all(12),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          // Logo arriba a la izquierda, sin líneas de encabezado
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Padding(
-                                padding: const EdgeInsets.only(top: 6),
-                                child: _ClubLogo(
-                                  logoUrl: club.logoUrl,
-                                  borderColor: scheme.secondary,
-                                ),
-                              ),
-                            ],
+                          // Logo + badge "Al día / Rechazado"
+                          Align(
+                            alignment: Alignment.topRight,
+                            child: _ClubLogo(
+                              logoUrl: club.logoUrl,
+                              borderColor: scheme.secondary,
+                            ),
                           ),
-                          const SizedBox(height: 4),
+                          const SizedBox(height: 8),
 
-                          // Foto + nombre + número
+
+                          // Foto + nombre + DNI/número
                           Center(
                             child: Column(
                               children: [
-                                _SocioAvatar(
-                                  fotoUrl: socio.fotoUrl,
-                                  borderColor: scheme.secondary,
-                                  fotoPreviewBytes: _fotoPreviewBytes,
-                                  cargando: _subiendoFoto,
-                                  onTapCamera: _tomarFotoYEnviar,
+                                SizedBox(
+                                  width: 110,
+                                  height: 110,
+                                  child: _SocioAvatar(
+                                    fotoUrl: socio.fotoUrl,
+                                    borderColor: scheme.secondary,
+                                    fotoPreviewBytes: _fotoPreviewBytes,
+                                    cargando: _subiendoFoto,
+                                    onTapCamera: _tomarFotoYEnviar,
+                                  ),
                                 ),
-                                const SizedBox(height: 12),
+                                const SizedBox(height: 8),
                                 Text(
                                   socio.nombreCompleto,
                                   textAlign: TextAlign.center,
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color: scheme.onPrimary,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w900,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
                                   ),
                                 ),
-                                const SizedBox(height: 4),
+                                const SizedBox(height: 2),
                                 Text(
-                                  'DNI: ${socio.dni} • Socio Nº ${socio.numero}',
+                                  'DNI ${socio.dni} · Socio Nº ${socio.numero}',
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
-                                    color: scheme.onPrimary.withOpacity(0.9),
-                                    fontSize: 13,
+                                    color: Colors.white.withOpacity(0.75),
+                                    fontSize: 11,
                                   ),
                                 ),
                               ],
@@ -222,43 +238,92 @@ final alDia = socio.alDia == true;
 
                           const SizedBox(height: 10),
 
-                          _datoRow(context, 'Actividad', socio.actividad),
-                          _datoRow(context, 'Categoría', socio.categoria),
-                          _datoRow(
-                            context,
-                            'Año Nac.',
-                            DateUtilsApp.yearFromIso(socio.fechaNacimiento),
-                          ),
-                          _datoRow(
-                            context,
-                            'Ingreso',
-                            DateUtilsApp.isoToDMY(socio.fechaIngreso),
+                          // Panel "vidrio" con Actividad / Categoría / Año Nac. / Ingreso
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 12,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: Colors.white.withOpacity(0.25),
+                              ),
+                            ),
+                            child: Column(
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: _MiniDato(
+                                        label: 'Actividad',
+                                        valor: socio.actividad,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: _MiniDato(
+                                        label: 'Categoría',
+                                        valor: socio.categoria,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 10),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: _MiniDato(
+                                        label: 'Año nac.',
+                                        valor: DateUtilsApp.yearFromIso(
+                                          socio.fechaNacimiento,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: _MiniDato(
+                                        label: 'Ingreso',
+                                        valor: DateUtilsApp.isoToDMY(
+                                          socio.fechaIngreso,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
                           ),
 
                           const SizedBox(height: 10),
 
-                          
-
+                          // Franja destacada de "Último pago"
                           Container(
-                            margin: const EdgeInsets.only(top: 8),
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 10,
+                              horizontal: 14,
+                              vertical: 12,
                             ),
                             decoration: BoxDecoration(
                               color: alDia
-    ? Colors.greenAccent.withOpacity(0.15)
-    : Colors.redAccent.withOpacity(0.15),
+                                  ? Colors.greenAccent.withOpacity(0.18)
+                                  : Colors.redAccent.withOpacity(0.18),
                               borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: alDia
+                                    ? Colors.greenAccent.withOpacity(0.4)
+                                    : Colors.redAccent.withOpacity(0.4),
+                              ),
                             ),
                             child: Row(
                               children: [
                                 Icon(
-  alDia ? Icons.check_circle : Icons.cancel,
-  color: alDia ? Colors.greenAccent : Colors.redAccent,
-  size: 20,
-),
-
+                                  alDia ? Icons.check_circle : Icons.cancel,
+                                  color: alDia
+                                      ? Colors.greenAccent
+                                      : Colors.redAccent,
+                                  size: 20,
+                                ),
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: Column(
@@ -268,7 +333,7 @@ final alDia = socio.alDia == true;
                                       Text(
                                         'Último pago',
                                         style: TextStyle(
-                                          color: scheme.onPrimary.withOpacity(0.8),
+                                          color: Colors.white.withOpacity(0.7),
                                           fontSize: 11,
                                           fontWeight: FontWeight.w600,
                                         ),
@@ -278,25 +343,19 @@ final alDia = socio.alDia == true;
                                         style: const TextStyle(
                                           color: Colors.white,
                                           fontSize: 15,
-                                          fontWeight: FontWeight.w900,
+                                          fontWeight: FontWeight.w800,
                                         ),
                                       ),
                                     ],
                                   ),
                                 ),
-                                Icon(
-                                  Icons.circle,
-                                  size: 10,
-                                  color: socio.alDia
-                                      ? Colors.greenAccent
-                                      : Colors.redAccent,
-                                ),
                               ],
                             ),
                           ),
 
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 16),
 
+                          // QR
                           Center(
                             child: LayoutBuilder(
                               builder: (context, c) {
@@ -304,10 +363,10 @@ final alDia = socio.alDia == true;
                                 final qrSize = maxSide.clamp(96.0, 140.0);
 
                                 return Container(
-                                  padding: const EdgeInsets.all(6),
+                                  padding: const EdgeInsets.all(8),
                                   decoration: BoxDecoration(
                                     color: Colors.white,
-                                    borderRadius: BorderRadius.circular(16),
+                                    borderRadius: BorderRadius.circular(14),
                                   ),
                                   child: SizedBox(
                                     width: qrSize,
@@ -337,33 +396,65 @@ final alDia = socio.alDia == true;
       ),
     );
   }
+}
 
-  Widget _datoRow(BuildContext context, String label, String value) {
-    final scheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Row(
-        children: [
-          Text(
-            '$label: ',
-            style: TextStyle(
-              color: scheme.onPrimary,
-              fontWeight: FontWeight.w700,
-              fontSize: 13,
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value.isEmpty ? '—' : value,
-              textAlign: TextAlign.right,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 13,
-              ),
-            ),
-          ),
-        ],
+/// Badge "Al día" / "Rechazado" en la esquina superior derecha
+class _EstadoBadge extends StatelessWidget {
+  final bool alDia;
+
+  const _EstadoBadge({required this.alDia});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(top: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withOpacity(0.3)),
       ),
+      child: Text(
+        alDia ? 'Al día' : 'Rechazado',
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+}
+
+/// Un dato chico dentro del panel "vidrio" (label arriba, valor abajo)
+class _MiniDato extends StatelessWidget {
+  final String label;
+  final String valor;
+
+  const _MiniDato({required this.label, required this.valor});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.65),
+            fontSize: 10,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          valor.isEmpty ? '—' : valor,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -464,14 +555,14 @@ class _SocioAvatar extends StatelessWidget {
     final dataFotoBytes = _bytesFromDataImageUrl(rawFoto);
 
     return SizedBox(
-      width: 150,
-      height: 150,
+      width: 110,
+      height: 110,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
           Container(
-            width: 150,
-            height: 150,
+            width: 110,
+            height: 110,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(

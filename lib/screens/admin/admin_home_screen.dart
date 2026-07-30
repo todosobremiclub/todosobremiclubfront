@@ -82,6 +82,16 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     return rolesPermitidos.contains(_session!.role);
   }
 
+  static const Map<String, String> _roleLabels = {
+    'admin': 'Administrador',
+    'superadmin': 'Super administrador',
+    'finanzas': 'Finanzas',
+    'comunicacion': 'Comunicación',
+    'profesor': 'Profesor',
+    'asistencias': 'Asistencias',
+    'solo_lectura': 'Solo lectura',
+  };
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -97,134 +107,273 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
 
     final token = _session!.token;
     final clubId = _session!.clubId;
+    final scheme = Theme.of(context).colorScheme;
 
     // 🔒 solo_lectura no tiene acceso a ninguna acción de la app
     if (_session!.role == 'solo_lectura') {
       return Scaffold(
-        appBar: AppBar(
-          title: Text(_session!.clubName),
-          actions: [
-            IconButton(onPressed: _logout, icon: const Icon(Icons.logout)),
-          ],
-        ),
+        backgroundColor: Colors.white,
+        appBar: _buildAppBar(),
         body: const Center(
           child: Padding(
             padding: EdgeInsets.all(24),
             child: Text(
               'Tu rol (solo lectura) no tiene acciones habilitadas en la app.',
               textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.black54),
             ),
           ),
         ),
       );
     }
 
-    final botones = <_AccionAdmin>[
-      _AccionAdmin(
-        titulo: 'Registrar pago de cuota',
-        icono: Icons.payments,
-        visible: _puede(['admin', 'finanzas']),
-        onTap: () => _abrir(PagoFormScreen(token: token, clubId: clubId)),
-      ),
-      _AccionAdmin(
-        titulo: 'Registrar ingreso',
-        icono: Icons.point_of_sale,
-        visible: _puede(['admin', 'finanzas']),
-        onTap: () => _abrir(IngresoFormScreen(token: token, clubId: clubId)),
-      ),
-      _AccionAdmin(
-        titulo: 'Registrar gasto',
-        icono: Icons.receipt_long,
-        visible: _puede(['admin', 'finanzas']),
-        onTap: () => _abrir(GastoFormScreen(token: token, clubId: clubId)),
-      ),
-      _AccionAdmin(
-        titulo: 'Cargar nuevo socio',
-        icono: Icons.person_add,
-        visible: _puede(['admin']),
-        onTap: () => _abrir(SocioFormScreen(token: token, clubId: clubId)),
-      ),
-      _AccionAdmin(
-        titulo: 'Buscar socio',
-        icono: Icons.search,
-        visible: _puede(['admin', 'profesor']),
-        onTap: () => _abrir(BuscarSocioScreen(token: token, clubId: clubId)),
-      ),
-      _AccionAdmin(
-        titulo: 'Publicar noticia',
-        icono: Icons.campaign,
-        visible: _puede(['admin', 'comunicacion', 'profesor']),
-        onTap: () => _abrir(NoticiaFormScreen(token: token, clubId: clubId)),
-      ),
-      _AccionAdmin(
-        titulo: 'Enviar notificación',
-        icono: Icons.notifications_active,
-        visible: _puede(['admin', 'comunicacion', 'profesor']),
-        onTap: () => _abrir(NotificacionFormScreen(token: token, clubId: clubId)),
-      ),
-      _AccionAdmin(
-        titulo: 'Registrar asistencia',
-        icono: Icons.fact_check,
-        visible: _puede(['admin', 'asistencias']),
-        onTap: () => _abrir(AsistenciaFormScreen(token: token, clubId: clubId)),
-      ),
-      _AccionAdmin(
-        titulo: 'Control de acceso',
-        icono: Icons.qr_code_scanner,
-        visible: _puede(['admin']),
-        onTap: () => _abrir(const ControlAccesoScreen()),
-      ),
-    ].where((a) => a.visible).toList();
-
-    return Scaffold(
-      appBar: AppBar(
-        title: Row(
-          children: [
-            if (_logoUrl != null && _logoUrl!.isNotEmpty) ...[
-              CircleAvatar(
-                radius: 16,
-                backgroundColor: Colors.white,
-                backgroundImage: NetworkImage(_logoUrl!),
-              ),
-              const SizedBox(width: 10),
-            ],
-            Expanded(child: Text(_session!.clubName, overflow: TextOverflow.ellipsis)),
-          ],
-        ),
-        actions: [
-          IconButton(onPressed: _logout, icon: const Icon(Icons.logout)),
+    final secciones = <_Seccion>[
+      _Seccion(
+        titulo: 'Finanzas',
+        color: Colors.teal,
+        acciones: [
+          _AccionAdmin(
+            titulo: 'Registrar pago de cuota',
+            icono: Icons.payments_outlined,
+            visible: _puede(['admin', 'finanzas']),
+            onTap: () => _abrir(PagoFormScreen(token: token, clubId: clubId)),
+          ),
+          _AccionAdmin(
+            titulo: 'Registrar ingreso',
+            icono: Icons.point_of_sale_outlined,
+            visible: _puede(['admin']),
+            onTap: () => _abrir(IngresoFormScreen(token: token, clubId: clubId)),
+          ),
+          _AccionAdmin(
+            titulo: 'Registrar gasto',
+            icono: Icons.receipt_long_outlined,
+            visible: _puede(['admin', 'finanzas']),
+            onTap: () => _abrir(GastoFormScreen(token: token, clubId: clubId)),
+          ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Sesión: ${_session!.email} (${_session!.role})',
-              style: const TextStyle(color: Colors.black54),
+      _Seccion(
+        titulo: 'Socios',
+        color: Colors.indigo,
+        acciones: [
+          _AccionAdmin(
+            titulo: 'Cargar nuevo socio',
+            icono: Icons.person_add_alt_1_outlined,
+            visible: _puede(['admin']),
+            onTap: () => _abrir(SocioFormScreen(token: token, clubId: clubId)),
+          ),
+          _AccionAdmin(
+            titulo: 'Buscar socio',
+            icono: Icons.search,
+            visible: _puede(['admin', 'profesor']),
+            onTap: () => _abrir(BuscarSocioScreen(token: token, clubId: clubId)),
+          ),
+        ],
+      ),
+      _Seccion(
+        titulo: 'Comunicación',
+        color: Colors.deepPurple,
+        acciones: [
+          _AccionAdmin(
+            titulo: 'Publicar noticia',
+            icono: Icons.campaign_outlined,
+            visible: _puede(['admin', 'comunicacion', 'profesor']),
+            onTap: () => _abrir(NoticiaFormScreen(token: token, clubId: clubId)),
+          ),
+          _AccionAdmin(
+            titulo: 'Enviar notificación',
+            icono: Icons.notifications_active_outlined,
+            visible: _puede(['admin', 'comunicacion', 'profesor']),
+            onTap: () => _abrir(NotificacionFormScreen(token: token, clubId: clubId)),
+          ),
+        ],
+      ),
+      _Seccion(
+        titulo: 'Actividad',
+        color: Colors.deepOrange,
+        acciones: [
+_AccionAdmin(
+            titulo: 'Registrar asistencia',
+            icono: Icons.fact_check_outlined,
+            visible: _puede(['admin', 'asistencias', 'profesor']),
+            onTap: () => _abrir(AsistenciaFormScreen(token: token, clubId: clubId)),
+          ),
+          _AccionAdmin(
+            titulo: 'Control de acceso',
+            icono: Icons.qr_code_scanner,
+            visible: _puede(['admin']),
+            onTap: () => _abrir(const ControlAccesoScreen()),
+          ),
+        ],
+      ),
+    ];
+
+    // Nos quedamos solo con las secciones que tengan al menos 1 acción visible
+    final seccionesVisibles = secciones
+        .map((s) => _Seccion(
+              titulo: s.titulo,
+              color: s.color,
+              acciones: s.acciones.where((a) => a.visible).toList(),
+            ))
+        .where((s) => s.acciones.isNotEmpty)
+        .toList();
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF6F7F9),
+      appBar: _buildAppBar(),
+      body: seccionesVisibles.isEmpty
+          ? const Center(
+              child: Text(
+                'Tu rol no tiene acciones habilitadas.',
+                style: TextStyle(color: Colors.black54),
+              ),
+            )
+          : ListView(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+              children: [
+                _buildSesionCard(),
+                const SizedBox(height: 20),
+                for (final seccion in seccionesVisibles) ...[
+                  _buildTituloSeccion(seccion.titulo, seccion.color),
+                  const SizedBox(height: 10),
+                  GridView.count(
+                    crossAxisCount: 2,
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    mainAxisSpacing: 12,
+                    crossAxisSpacing: 12,
+                    childAspectRatio: 1.05,
+                    children: seccion.acciones
+                        .map((a) => _BotonAccion(accion: a, colorSeccion: seccion.color))
+                        .toList(),
+                  ),
+                  const SizedBox(height: 24),
+                ],
+              ],
             ),
-            const SizedBox(height: 20),
-            Expanded(
-              child: botones.isEmpty
-                  ? const Center(
-                      child: Text('Tu rol no tiene acciones habilitadas.'),
-                    )
-                  : GridView.count(
-                      crossAxisCount: 2,
-                      mainAxisSpacing: 12,
-                      crossAxisSpacing: 12,
-                      childAspectRatio: 1.1,
-                      children: botones.map((a) {
-                        return _BotonAccion(accion: a);
-                      }).toList(),
-                    ),
+    );
+  }
+
+  PreferredSizeWidget _buildAppBar() {
+    return AppBar(
+      backgroundColor: Theme.of(context).colorScheme.primary,
+      title: Row(
+        children: [
+          if (_logoUrl != null && _logoUrl!.isNotEmpty) ...[
+            CircleAvatar(
+              radius: 16,
+              backgroundColor: Colors.white,
+              backgroundImage: NetworkImage(_logoUrl!),
             ),
+            const SizedBox(width: 10),
           ],
+          Expanded(
+            child: Text(
+              _session!.clubName,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        IconButton(
+          onPressed: _logout,
+          icon: const Icon(Icons.logout),
+          tooltip: 'Cerrar sesión',
         ),
+      ],
+    );
+  }
+
+  Widget _buildSesionCard() {
+    final roleLabel = _roleLabels[_session!.role] ?? _session!.role;
+    final scheme = Theme.of(context).colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.black.withOpacity(0.06)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: scheme.primary.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(Icons.person_outline, color: scheme.primary, size: 22),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _session!.email,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  roleLabel,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: scheme.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
+
+  Widget _buildTituloSeccion(String titulo, Color color) {
+    return Row(
+      children: [
+        Container(
+          width: 4,
+          height: 16,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          titulo,
+          style: const TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+            color: Colors.black87,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _Seccion {
+  final String titulo;
+  final Color color;
+  final List<_AccionAdmin> acciones;
+
+  _Seccion({
+    required this.titulo,
+    required this.color,
+    required this.acciones,
+  });
 }
 
 class _AccionAdmin {
@@ -243,34 +392,50 @@ class _AccionAdmin {
 
 class _BotonAccion extends StatelessWidget {
   final _AccionAdmin accion;
+  final Color colorSeccion;
 
-  const _BotonAccion({required this.accion});
+  const _BotonAccion({required this.accion, required this.colorSeccion});
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: accion.onTap,
+    return Material(
+      color: Colors.white,
       borderRadius: BorderRadius.circular(16),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.primary.withOpacity(0.08),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+      child: InkWell(
+        onTap: accion.onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.black.withOpacity(0.06)),
           ),
-        ),
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(accion.icono, size: 36),
-            const SizedBox(height: 8),
-            Text(
-              accion.titulo,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-          ],
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  color: colorSeccion.withOpacity(0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(accion.icono, size: 22, color: colorSeccion),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                accion.titulo,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

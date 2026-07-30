@@ -1,6 +1,6 @@
-
 import 'dart:math' as math;
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../../core/config/api_config.dart';
@@ -169,7 +169,7 @@ class _CumplesScreenState extends State<CumplesScreen>
                       ),
                   ],
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
                 if (hoy.isEmpty)
                   Text(
                     'Hoy no hay cumpleaños.',
@@ -177,7 +177,7 @@ class _CumplesScreenState extends State<CumplesScreen>
                   )
                 else
                   ...hoy.map((s) => _buildCumpleHoyCard(context, s)),
-                const SizedBox(height: 24),
+                const SizedBox(height: 28),
                 Text(
                   'Este mes cumplen',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
@@ -185,14 +185,14 @@ class _CumplesScreenState extends State<CumplesScreen>
                         color: scheme.onBackground,
                       ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
                 if (mes.isEmpty)
                   Text(
                     'No hay más cumpleaños este mes.',
                     style: TextStyle(color: scheme.onBackground),
                   )
                 else
-                  ...mes.map((ev) => _buildCumpleMesTile(context, ev)),
+                  _buildListaMes(context, mes),
               ],
             ),
             if (hoy.isNotEmpty)
@@ -200,7 +200,7 @@ class _CumplesScreenState extends State<CumplesScreen>
                 ignoring: true,
                 child: _BirthdayRain(
                   controller: _rainController,
-                  color: scheme.onPrimary,
+                  color: scheme.primary,
                 ),
               ),
           ],
@@ -216,86 +216,222 @@ class _CumplesScreenState extends State<CumplesScreen>
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: scheme.primary,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: scheme.primary.withOpacity(0.25)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.25),
-            blurRadius: 6,
-            offset: const Offset(0, 3),
+            color: scheme.primary.withOpacity(0.15),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.all(10),
-        leading: CircleAvatar(
-          radius: 24,
-          backgroundColor: Colors.black26,
-          backgroundImage: foto.isNotEmpty ? NetworkImage(foto) : null,
-          child: foto.isEmpty
-              ? const Icon(Icons.person, size: 28, color: Colors.white70)
-              : null,
-        ),
-        title: Text(
-          nombre,
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-            color: scheme.onPrimary,
+      child: Row(
+        children: [
+          SizedBox(
+            width: 56,
+            height: 56,
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: scheme.primary, width: 2.5),
+                  ),
+                  child: ClipOval(
+                    child: Builder(
+                      builder: (context) {
+                        final dataBytes = _bytesFromDataImageUrl(foto);
+
+                        if (dataBytes != null) {
+                          return Image.memory(dataBytes, fit: BoxFit.cover);
+                        }
+
+                        if (foto.isNotEmpty) {
+                          return Image.network(
+                            foto,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(
+                              color: scheme.primary.withOpacity(0.12),
+                              child: Icon(
+                                Icons.person,
+                                color: scheme.primary.withOpacity(0.6),
+                              ),
+                            ),
+                          );
+                        }
+
+                        return Container(
+                          color: scheme.primary.withOpacity(0.12),
+                          child: Icon(
+                            Icons.person,
+                            color: scheme.primary.withOpacity(0.6),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+                Positioned(
+                  right: -4,
+                  bottom: -4,
+                  child: Container(
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      color: scheme.primary,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2),
+                    ),
+                    child: const Icon(Icons.cake, size: 13, color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-        subtitle: Text(
-          '¡Feliz cumpleaños! 🎉',
-          style: TextStyle(
-            color: scheme.onPrimary.withOpacity(0.85),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  nombre,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '¡Feliz cumpleaños! 🎉',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: scheme.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: scheme.primary.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Text(
+              'HOY',
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.5,
+                color: scheme.primary,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildCumpleMesTile(BuildContext context, Map<String, dynamic> ev) {
+  Widget _buildListaMes(BuildContext context, List<Map<String, dynamic>> mes) {
     final scheme = Theme.of(context).colorScheme;
-    final title = (ev['title'] ?? '').toString();
-    final dateStr = (ev['date'] ?? '').toString();
-    final dt = DateTime.tryParse(dateStr);
-    final dia = dt?.day ?? 0;
+
+    final ordenados = [...mes]
+      ..sort((a, b) {
+        final da = DateTime.tryParse((a['date'] ?? '').toString())?.day ?? 99;
+        final db = DateTime.tryParse((b['date'] ?? '').toString())?.day ?? 99;
+        return da.compareTo(db);
+      });
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: scheme.primary,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.2),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.black.withOpacity(0.06)),
       ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        leading: Icon(
-          Icons.cake_outlined,
-          color: scheme.onPrimary,
-        ),
-        title: Text(
-          title,
-          style: TextStyle(
-            color: scheme.onPrimary,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        subtitle: Text(
-          dia > 0 ? 'Día $dia' : dateStr,
-          style: TextStyle(
-            color: scheme.onPrimary.withOpacity(0.8),
-          ),
-        ),
+      child: Column(
+        children: List.generate(ordenados.length, (index) {
+          final ev = ordenados[index];
+          final title = (ev['title'] ?? '').toString();
+          final dateStr = (ev['date'] ?? '').toString();
+          final dt = DateTime.tryParse(dateStr);
+          final dia = dt?.day ?? 0;
+          final esUltimo = index == ordenados.length - 1;
+
+          return Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              border: esUltimo
+                  ? null
+                  : Border(
+                      bottom: BorderSide(color: Colors.black.withOpacity(0.06)),
+                    ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: scheme.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    dia > 0 ? '$dia' : '—',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: scheme.primary,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }),
       ),
     );
+  }
+}
+
+bool _isDataImageUrl(String? value) {
+  final v = (value ?? '').trim().toLowerCase();
+  return v.startsWith('data:image/');
+}
+
+Uint8List? _bytesFromDataImageUrl(String? value) {
+  try {
+    final raw = (value ?? '').trim();
+    if (raw.isEmpty) return null;
+    if (!_isDataImageUrl(raw)) return null;
+
+    final commaIndex = raw.indexOf(',');
+    if (commaIndex < 0) return null;
+
+    final b64 = raw.substring(commaIndex + 1);
+    return base64Decode(b64);
+  } catch (_) {
+    return null;
   }
 }
 

@@ -202,111 +202,193 @@ recibos.sort((a, b) {
     );
   }
 
-  Widget _buildReciboCard(
+Widget _buildReciboCard(
     BuildContext context,
     dynamic club,
     _ReciboPago recibo,
   ) {
-
-
     final scheme = Theme.of(context).colorScheme;
+
+    // Determinar color/etiqueta de estado para la franja lateral y el badge
+    Color colorEstado;
+    String labelEstado;
+
+    if (recibo.pendiente && _transferenciaHabilitada == true) {
+      if (recibo.estadoTransferencia == 'en_revision') {
+        colorEstado = Colors.blue;
+        labelEstado = 'En revisión';
+      } else if (recibo.estadoTransferencia == 'rechazado') {
+        colorEstado = Colors.redAccent;
+        labelEstado = 'Rechazada';
+      } else {
+        colorEstado = Colors.orange;
+        labelEstado = 'Pendiente';
+      }
+    } else if (recibo.pendiente) {
+      colorEstado = Colors.orange;
+      labelEstado = 'Pendiente';
+    } else {
+      colorEstado = Colors.green;
+      labelEstado = 'Pagado';
+    }
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: scheme.primary,
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            club.nombre,
-            style: TextStyle(
-              color: scheme.onPrimary,
-              fontWeight: FontWeight.bold,
-            ),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.black.withOpacity(0.06)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
           ),
-          const SizedBox(height: 6),
-          _row('Mes', recibo.mesNombreConAnio, scheme),
-
-          if (recibo.pendiente && _transferenciaHabilitada == true) ...[
-  const SizedBox(height: 6),
-
-  // ✅ EN REVISIÓN
-  if (recibo.estadoTransferencia == 'en_revision') ...[
-    _row('Estado', 'En revisión', scheme),
-  ]
-
-// ✅ RECHAZADO (con motivo real del club)
-  else if (recibo.estadoTransferencia == 'rechazado') ...[
-    _row('Estado', 'Rechazada', scheme),
-    if (recibo.motivoRechazo != null && recibo.motivoRechazo!.trim().isNotEmpty) ...[
-      const SizedBox(height: 4),
-      _row('Motivo', recibo.motivoRechazo!, scheme),
-    ] else ...[
-      const SizedBox(height: 4),
-      _row('Motivo', 'Por favor comunicarse con el club', scheme),
-    ],
-  ]
-
-  // ✅ PENDIENTE NORMAL
-  else ...[
-    _row('Estado', 'Pendiente', scheme),
-    const SizedBox(height: 12),
-    SizedBox(
-      width: double.infinity,
-      child: ElevatedButton(
-        onPressed: _transferBusy ? null : () => _openTransferDialog(recibo),
-        child: const Text('Informar transferencia realizada'),
+        ],
       ),
-    ),
-  ],
-]
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              width: 5,
+              decoration: BoxDecoration(
+                color: colorEstado,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(16),
+                  bottomLeft: Radius.circular(16),
+                ),
+              ),
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            recibo.mesNombreConAnio,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.black87,
+                            ),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: colorEstado.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            labelEstado,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: colorEstado,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
 
-else ...[
-  _row('Fecha', recibo.fechaPagoDMY, scheme),
-  _row('Monto', recibo.montoFormatoArs, scheme),
-  _row('Método', recibo.metodoPagoLabel, scheme),
+                    if (recibo.pendiente && _transferenciaHabilitada == true) ...[
+                      const SizedBox(height: 10),
 
-  const SizedBox(height: 10),
-
-  Align(
-    alignment: Alignment.centerRight,
-    child: IconButton(
-      icon: const Icon(Icons.picture_as_pdf, color: Colors.white),
-      tooltip: 'Descargar PDF',
-      onPressed: () => _descargarPdfRecibo(recibo, club),
-    ),
-  ),
-],
-       ],
+                      if (recibo.estadoTransferencia == 'rechazado') ...[
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.redAccent.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            (recibo.motivoRechazo != null &&
+                                    recibo.motivoRechazo!.trim().isNotEmpty)
+                                ? recibo.motivoRechazo!
+                                : 'Por favor comunicarse con el club',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.redAccent.shade700,
+                            ),
+                          ),
+                        ),
+                      ] else if (recibo.estadoTransferencia == 'en_revision') ...[
+                        Text(
+                          'Estamos revisando tu comprobante.',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.black.withOpacity(0.6),
+                          ),
+                        ),
+                      ] else ...[
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: _transferBusy
+                                ? null
+                                : () => _openTransferDialog(recibo),
+                            child: const Text('Informar transferencia realizada'),
+                          ),
+                        ),
+                      ],
+                    ] else ...[
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _miniDatoRecibo('Fecha', recibo.fechaPagoDMY),
+                          ),
+                          Expanded(
+                            child: _miniDatoRecibo('Monto', recibo.montoFormatoArs),
+                          ),
+                          Expanded(
+                            child: _miniDatoRecibo('Método', recibo.metodoPagoLabel),
+                          ),
+                          IconButton(
+                            icon: Icon(Icons.picture_as_pdf, color: scheme.primary),
+                            tooltip: 'Descargar PDF',
+                            onPressed: () => _descargarPdfRecibo(recibo, club),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _row(String label, String value, ColorScheme scheme) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Row(
-        children: [
-          Text(
-            '$label: ',
-            style: TextStyle(
-              color: scheme.onPrimary.withOpacity(0.85),
-              fontWeight: FontWeight.w600,
-            ),
+  Widget _miniDatoRecibo(String label, String value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(fontSize: 10, color: Colors.black.withOpacity(0.45)),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: Colors.black87,
           ),
-          Expanded(
-            child: Text(
-              value,
-              textAlign: TextAlign.right,
-              style: TextStyle(color: scheme.onPrimary),
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 

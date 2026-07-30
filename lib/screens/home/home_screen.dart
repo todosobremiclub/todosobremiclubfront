@@ -9,7 +9,7 @@ import '../carnet/carnet_screen.dart';
 import '../noticias/noticias_screen.dart';
 import '../cumples/cumples_screen.dart';
 import '../recibos/recibos_screen.dart';
-import '../debug/push_debug_screen.dart';
+
 
 class HomeScreen extends StatefulWidget {
   final AppSession session;
@@ -270,6 +270,8 @@ class _HomeScreenState extends State<HomeScreen> {
         title: Row(
           children: [
             const SizedBox(width: 12),
+            _HomeClubLogo(logoUrl: club.logoUrl),
+            const SizedBox(width: 10),
             Expanded(
               child: Text(
                 club.nombre,
@@ -282,22 +284,23 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ],
         ),
-actions: [
-          IconButton(
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => PushDebugScreen(
-                    clubId: widget.session.clubObj.id.toString(),
-                  ),
-                ),
-              );
-            },
-            icon: const Icon(Icons.bug_report),
-          ),
+        actions: [
           IconButton(
             onPressed: _openInstagram,
-            icon: Image.asset('assets/icons/instagram.png', width: 24),
+            tooltip: 'Instagram',
+            icon: Container(
+              width: 30,
+              height: 30,
+              padding: const EdgeInsets.all(5),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+              ),
+              child: Image.asset(
+                'assets/icons/instagram.png',
+                fit: BoxFit.contain,
+              ),
+            ),
           ),
           IconButton(
             onPressed: _abrirNotificaciones,
@@ -352,6 +355,37 @@ actions: [
             label: 'Recibos',
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _HomeClubLogo extends StatelessWidget {
+  final String? logoUrl;
+
+  const _HomeClubLogo({required this.logoUrl});
+
+  @override
+  Widget build(BuildContext context) {
+    final hasLogo = (logoUrl ?? '').trim().isNotEmpty;
+
+    return Container(
+      width: 32,
+      height: 32,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        shape: BoxShape.circle,
+      ),
+      padding: const EdgeInsets.all(4),
+      child: ClipOval(
+        child: hasLogo
+            ? Image.network(
+                logoUrl!,
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) =>
+                    const Icon(Icons.shield_outlined, size: 16, color: Colors.black45),
+              )
+            : const Icon(Icons.shield_outlined, size: 16, color: Colors.black45),
       ),
     );
   }
