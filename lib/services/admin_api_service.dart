@@ -81,11 +81,26 @@ class AdminApiService {
     required String clubId,
     required String titulo,
     required String cuerpo,
+    String destinoTipo = 'todos',
+    String? destinoValor1,
+    String? destinoValor2,
   }) async {
     await post(
       token: token,
       path: '/club/$clubId/notificaciones',
-      body: {'titulo': titulo, 'cuerpo': cuerpo},
+      body: {
+        'titulo': titulo,
+        'cuerpo': cuerpo,
+        // El backend espera el destino ANIDADO dentro de "data"
+        // (a diferencia de publicarNoticia, que lo manda en el nivel raíz).
+        'data': {
+          'destino_tipo': destinoTipo,
+          if (destinoValor1 != null && destinoValor1.isNotEmpty)
+            'destino_valor1': destinoValor1,
+          if (destinoValor2 != null && destinoValor2.isNotEmpty)
+            'destino_valor2': destinoValor2,
+        },
+      },
     );
   }
 
@@ -461,6 +476,126 @@ class AdminApiService {
         'responsable_id': responsableId,
         'monto': monto,
         if (descripcion != null && descripcion.isNotEmpty) 'descripcion': descripcion,
+      },
+    );
+  }
+
+// ======================================================
+  // Agenda (eventos + cumpleaños)
+  // GET /club/:clubId/cumples (sin "mes" -> trae todo el año,
+  // así cubrimos cualquier semana sin preocuparnos por el límite de mes)
+  // ======================================================
+  static Future<Map<String, dynamic>> getAgendaEventos({
+    required String token,
+    required String clubId,
+  }) async {
+    final data = await get(token: token, path: '/club/$clubId/cumples');
+    final eventos = (data['eventos'] as List?) ?? [];
+    return {
+      'eventos': eventos.map((e) => Map<String, dynamic>.from(e)).toList(),
+    };
+  }
+
+  static Future<void> crearEventoAgenda({
+    required String token,
+    required String clubId,
+    required String fecha, // YYYY-MM-DD
+    required String horaDesde, // HH:MM
+    required String horaHasta, // HH:MM
+    required String titulo,
+    String? descripcion,
+  }) async {
+    await post(
+      token: token,
+      path: '/club/$clubId/agenda/actividades',
+      body: {
+        'fecha': fecha,
+        'hora_desde': horaDesde,
+        'hora_hasta': horaHasta,
+        'titulo': titulo,
+        if (descripcion != null && descripcion.isNotEmpty) 'descripcion': descripcion,
+      },
+    );
+  }
+
+  // ======================================================
+  // Pendientes: postulaciones de socios (altas / cambio de foto)
+  // ======================================================
+  static Future<List<Map<String, dynamic>>> getPendientesSocios({
+    required String token,
+    required String clubId,
+  }) async {
+    final data = await get(token: token, path: '/club/$clubId/pendientes');
+    final items = (data['items'] as List?) ?? [];
+    return items.map((p) => Map<String, dynamic>.from(p)).toList();
+  }
+
+  static Future<void> aceptarPendiente({
+    required String token,
+    required String clubId,
+    required String id,
+  }) async {
+    await post(
+      token: token,
+      path: '/club/$clubId/pendientes/$id/aceptar',
+      body: const {},
+    );
+  }
+
+  static Future<void> rechazarPendiente({
+    required String token,
+    required String clubId,
+    required String id,
+    String? motivo,
+  }) async {
+    await post(
+      token: token,
+      path: '/club/$clubId/pendientes/$id/rechazar',
+      body: {
+        if (motivo != null && motivo.isNotEmpty) 'motivo': motivo,
+      },
+    );
+  }
+
+  // ======================================================
+  // Pendientes: transferencias de pago
+  // ======================================================
+  static Future<List<Map<String, dynamic>>> getTransferenciasPendientes({
+    required String token,
+    required String clubId,
+  }) async {
+    final data = await get(
+      token: token,
+      path: '/club/$clubId/payments/transfer/pending?estado=all',
+    );
+    final items = (data['items'] as List?) ?? [];
+    return items.map((t) => Map<String, dynamic>.from(t)).toList();
+  }
+
+  static Future<void> confirmarTransferencia({
+    required String token,
+    required String clubId,
+    required String id,
+    required String fechaPago,
+  }) async {
+    await post(
+      token: token,
+      path: '/club/$clubId/payments/transfer/$id/confirm',
+      body: {'fecha_pago': fechaPago},
+    );
+  }
+
+  static Future<void> rechazarTransferencia({
+    required String token,
+    required String clubId,
+    required String id,
+    String? motivo,
+  }) async {
+    await post(
+      token: token,
+      path: '/club/$clubId/payments/transfer/$id/reject',
+      body: {
+        if (motivo != null && motivo.isNotEmpty) 'motivo': motivo,
       },
     );
   }

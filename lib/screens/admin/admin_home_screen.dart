@@ -14,6 +14,8 @@ import 'asistencia_form_screen.dart';
 import 'ingreso_form_screen.dart';
 import 'gasto_form_screen.dart';
 import 'buscar_socio_screen.dart';
+import 'agenda_screen.dart';
+import 'pendientes_screen.dart';
 
 class AdminHomeScreen extends StatefulWidget {
   const AdminHomeScreen({super.key});
@@ -172,7 +174,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
           ),
         ],
       ),
-      _Seccion(
+_Seccion(
         titulo: 'Socios',
         color: Colors.indigo,
         acciones: [
@@ -188,9 +190,16 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             visible: _puede(['admin', 'profesor']),
             onTap: () => _abrir(BuscarSocioScreen(token: token, clubId: clubId)),
           ),
+          _AccionAdmin(
+            titulo: 'Pendientes',
+            icono: Icons.pending_actions_outlined,
+            visible: _puede(['admin']),
+            onTap: () => _abrir(PendientesScreen(token: token, clubId: clubId)),
+          ),
         ],
       ),
-      _Seccion(
+
+_Seccion(
         titulo: 'Comunicación',
         color: Colors.deepPurple,
         acciones: [
@@ -205,6 +214,12 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             icono: Icons.notifications_active_outlined,
             visible: _puede(['admin', 'comunicacion', 'profesor']),
             onTap: () => _abrir(NotificacionFormScreen(token: token, clubId: clubId)),
+          ),
+          _AccionAdmin(
+            titulo: 'Agenda',
+            icono: Icons.event_outlined,
+            visible: _puede(['admin', 'comunicacion']),
+            onTap: () => _abrir(AgendaScreen(token: token, clubId: clubId)),
           ),
         ],
       ),

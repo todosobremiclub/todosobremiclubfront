@@ -23,6 +23,224 @@ class _CarnetScreenState extends State<CarnetScreen> {
   Uint8List? _fotoPreviewBytes;
   bool _subiendoFoto = false;
 
+  Map<String, dynamic>? _asistenciaResumen;
+  bool _cargandoAsistencia = true;
+  String _mesAsistenciaActual = '';
+
+  @override
+  void initState() {
+    super.initState();
+    final ahora = DateTime.now();
+    _mesAsistenciaActual =
+        '${ahora.year}-${ahora.month.toString().padLeft(2, '0')}';
+    _cargarAsistencias(_mesAsistenciaActual);
+  }
+
+  Future<Map<String, dynamic>?> _fetchAsistenciasMes(String mes) async {
+    try {
+      final token = widget.session.token;
+      final res = await http.get(
+        Uri.parse('${ApiConfig.baseUrl}/app/asistencias?mes=$mes'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      final data = jsonDecode(res.body);
+      if (res.statusCode == 200 && data['ok'] == true) {
+        return Map<String, dynamic>.from(data);
+      }
+    } catch (_) {
+      // Si falla, simplemente no mostramos el indicador (falla silenciosa,
+      // igual que el resto de las cargas secundarias del carnet).
+    }
+    return null;
+  }
+
+  Future<void> _cargarAsistencias(String mes) async {
+    final data = await _fetchAsistenciasMes(mes);
+    if (!mounted) return;
+    setState(() {
+      _asistenciaResumen = data;
+      _mesAsistenciaActual = mes;
+      _cargandoAsistencia = false;
+    });
+  }
+
+  String _nombreMes(String ym) {
+    const meses = [
+      'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+    ];
+    final partes = ym.split('-');
+    if (partes.length != 2) return ym;
+    final anio = partes[0];
+    final mesIdx = int.tryParse(partes[1]) ?? 1;
+    final nombre = (mesIdx >= 1 && mesIdx <= 12) ? meses[mesIdx - 1] : ym;
+    return '$nombre $anio';
+  }
+
+  Future<void> _abrirDetalleAsistencias() async {
+    String mesSel = _mesAsistenciaActual;
+    Map<String, dynamic>? data = _asistenciaResumen;
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            Future<void> cambiarMes(int delta) async {
+              final partes = mesSel.split('-');
+              var anio = int.parse(partes[0]);
+              var mes = int.parse(partes[1]) + delta;
+              if (mes == 0) {
+                mes = 12;
+                anio -= 1;
+              }
+              if (mes == 13) {
+                mes = 1;
+                anio += 1;
+              }
+              final nuevoMes = '$anio-${mes.toString().padLeft(2, '0')}';
+
+              final nuevaData = await _fetchAsistenciasMes(nuevoMes);
+              setModalState(() {
+                mesSel = nuevoMes;
+                data = nuevaData;
+              });
+            }
+
+            final detalle = (data?['detalle'] as List?) ?? [];
+            final presentes = data?['resumen']?['presentes'] ?? 0;
+            final ausentes = data?['resumen']?['ausentes'] ?? 0;
+
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.chevron_left),
+                          onPressed: () => cambiarMes(-1),
+                        ),
+                        Expanded(
+                          child: Text(
+                            _nombreMes(mesSel),
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.chevron_right),
+                          onPressed: () => cambiarMes(1),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _resumenPill(
+                          Icons.check_circle,
+                          Colors.green,
+                          '$presentes presentes',
+                        ),
+                        const SizedBox(width: 10),
+                        _resumenPill(
+                          Icons.cancel,
+                          Colors.red,
+                          '$ausentes ausentes',
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    if (detalle.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 24),
+                        child: Center(child: Text('Sin registros este mes.')),
+                      )
+                    else
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxHeight: 360),
+                        child: ListView.separated(
+                          shrinkWrap: true,
+                          itemCount: detalle.length,
+                          separatorBuilder: (_, __) => const Divider(height: 1),
+                          itemBuilder: (context, i) {
+                            final d = Map<String, dynamic>.from(detalle[i]);
+                            final presente = d['presente'] == true;
+                            final fecha = (d['fecha'] ?? '').toString();
+                            final dt = DateTime.tryParse(fecha);
+                            final fechaFmt = dt == null
+                                ? fecha
+                                : '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}';
+                            final actividad = (d['actividad'] ?? '').toString();
+                            final tipo = (d['tipo'] ?? '').toString();
+
+                            return ListTile(
+                              leading: Icon(
+                                presente ? Icons.check_circle : Icons.cancel,
+                                color: presente ? Colors.green : Colors.red,
+                              ),
+                              title: Text('$fechaFmt · $actividad'),
+                              subtitle: Text(
+                                tipo == 'partido' ? 'Partido' : 'Entrenamiento',
+                              ),
+                              trailing: Text(
+                                presente ? 'Presente' : 'Ausente',
+                                style: TextStyle(
+                                  color: presente ? Colors.green : Colors.red,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _resumenPill(IconData icon, Color color, String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.w600,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _tomarFotoYEnviar() async {
     if (_subiendoFoto) return;
 
@@ -297,6 +515,26 @@ class _CarnetScreenState extends State<CarnetScreen> {
                           ),
 
                           const SizedBox(height: 10),
+
+                          if (!_cargandoAsistencia &&
+                              _asistenciaResumen != null &&
+                              _asistenciaResumen!['tieneHistorial'] == true) ...[
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: _AsistenciaChip(
+                                presentes: (_asistenciaResumen!['resumen']
+                                            ?['presentes'] ??
+                                        0)
+                                    as int,
+                                ausentes: (_asistenciaResumen!['resumen']
+                                            ?['ausentes'] ??
+                                        0)
+                                    as int,
+                                onTap: _abrirDetalleAsistencias,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                          ],
 
                           // Franja destacada de "Último pago"
                           Container(
@@ -628,6 +866,96 @@ class _SocioAvatar extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Indicador muy sutil de asistencias/ausencias del mes, ubicado dentro
+/// de la tarjeta del carnet. Solo se renderiza si el socio tiene al menos
+/// un registro histórico (lo decide el backend con "tieneHistorial").
+class _AsistenciaChip extends StatelessWidget {
+  final int presentes;
+  final int ausentes;
+  final VoidCallback onTap;
+
+  const _AsistenciaChip({
+    required this.presentes,
+    required this.ausentes,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Text(
+          'este mes',
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.45),
+            fontSize: 9,
+          ),
+        ),
+        const SizedBox(height: 2),
+        InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(13),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.13),
+              borderRadius: BorderRadius.circular(13),
+              border: Border.all(color: Colors.white.withOpacity(0.25)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 6,
+                  height: 6,
+                  decoration: const BoxDecoration(
+                    color: Colors.greenAccent,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 5),
+                Text(
+                  '$presentes',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Container(
+                  width: 6,
+                  height: 6,
+                  decoration: const BoxDecoration(
+                    color: Colors.redAccent,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 5),
+                Text(
+                  '$ausentes',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Icon(
+                  Icons.chevron_right,
+                  size: 14,
+                  color: Colors.white.withOpacity(0.55),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
