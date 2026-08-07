@@ -99,21 +99,30 @@ Future<void> main() async {
     }
   }
 
-  // ======================================================
-  // 📡 SUSCRIPCIÓN AL CLUB
+// ======================================================
+  // 📡 SUSCRIPCIÓN A TOPICS DEL SOCIO (club, actividad,
+  // categoría, año de nacimiento y falta de pago)
   // ======================================================
   final session = await StorageService.loadSession();
 
   if (session != null && !kIsWeb) {
     final clubId = session.club['id'].toString();
+    final socioObj = session.socioObj;
 
-    print("📡 Suscribiendo al topic: club_$clubId");
+    print("📡 Sincronizando topics para club_$clubId");
 
-    await PushService.subscribeToClub(clubId);
+    await PushService.syncTopicsForSocio(
+      clubId: clubId,
+      actividad: socioObj.actividad,
+      categoria: socioObj.categoria,
+      anioNacimiento:
+          socioObj.anioNacimiento == '—' ? null : socioObj.anioNacimiento,
+      enFaltaPago: !socioObj.alDia,
+    );
 
-    print("✅ Suscripto a club_$clubId");
+    print("✅ Topics sincronizados para club_$clubId");
   } else {
-    print("⚠️ No hay sesión → no se suscribe a topic");
+    print("⚠️ No hay sesión → no se suscribe a topics");
   }
 
   // ======================================================

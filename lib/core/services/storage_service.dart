@@ -8,6 +8,10 @@ class StorageService {
   static const _kToken = 'app_token';
   static const _kSocio = 'app_socio';
   static const _kClub = 'app_club';
+  static const _kLoginAt = 'app_login_at'; // ✅ NUEVO: timestamp de login (auto-logout 8hs)
+
+  // ✅ NUEVO: tiempo máximo de sesión antes del auto-logout
+  static const Duration sessionMaxAge = Duration(hours: 8);
 
   // ===== Sesión de ADMINISTRADOR =====
   static const _kAdminToken = 'admin_token';
@@ -26,6 +30,8 @@ class StorageService {
     await prefs.setString(_kToken, token);
     await prefs.setString(_kSocio, jsonEncode(socio));
     await prefs.setString(_kClub, jsonEncode(club));
+    // ✅ NUEVO: marca el momento del login para el auto-logout de 8hs
+    await prefs.setString(_kLoginAt, DateTime.now().toIso8601String());
   }
 
   /// Devuelve null si falta algo
@@ -46,11 +52,26 @@ class StorageService {
     );
   }
 
+  /// ✅ NUEVO: true si pasaron 8hs o más desde el último login del socio.
+  /// Si no hay timestamp guardado (sesión guardada antes de este cambio,
+  /// o dato corrupto), se considera expirada por seguridad.
+  static Future<bool> isSessionExpired() async {
+    final prefs = await SharedPreferences.getInstance();
+    final loginAtStr = prefs.getString(_kLoginAt);
+    if (loginAtStr == null || loginAtStr.isEmpty) return true;
+
+    final loginAt = DateTime.tryParse(loginAtStr);
+    if (loginAt == null) return true;
+
+    return DateTime.now().difference(loginAt) >= sessionMaxAge;
+  }
+
   static Future<void> clearSession() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_kToken);
     await prefs.remove(_kSocio);
     await prefs.remove(_kClub);
+    await prefs.remove(_kLoginAt); // ✅ NUEVO
   }
 
   // ======================================================

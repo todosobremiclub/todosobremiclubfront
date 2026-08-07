@@ -83,7 +83,15 @@ class _LoginScreenState extends State<LoginScreen> {
         throw Exception('No se pudo recuperar la sesión después del login');
       }
 
-      await PushService.subscribeToClub(session.clubObj.id);
+      final socioObj = session.socioObj;
+      await PushService.syncTopicsForSocio(
+        clubId: session.clubObj.id,
+        actividad: socioObj.actividad,
+        categoria: socioObj.categoria,
+        anioNacimiento:
+            socioObj.anioNacimiento == '—' ? null : socioObj.anioNacimiento,
+        enFaltaPago: !socioObj.alDia,
+      );
 
       if (!mounted) return;
 

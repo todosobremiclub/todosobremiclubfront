@@ -17,6 +17,16 @@ class MyApp extends StatelessWidget {
 
     // Si no hay admin, seguimos con el flujo normal de SOCIO
     final appSession = await StorageService.loadSession();
+
+    // ✅ NUEVO: auto-logout si pasaron 8hs o más desde el login
+    if (appSession != null) {
+      final expirada = await StorageService.isSessionExpired();
+      if (expirada) {
+        await StorageService.clearSession();
+        return _SesionInicial(socio: null);
+      }
+    }
+
     return _SesionInicial(socio: appSession);
   }
 

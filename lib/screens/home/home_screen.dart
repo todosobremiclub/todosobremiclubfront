@@ -20,16 +20,33 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   int _index = 0;
   int _noticiasBadgeCount = 0;
   int _cumplesBadgeCount = 0;
 
-  @override
+@override
   void initState() {
     super.initState();
 
     NotificationStore.instance.addListener(_onNotificationsChanged);
+    WidgetsBinding.instance.addObserver(this); // ✅ NUEVO: auto-logout 8hs
+  }
+
+  // ✅ NUEVO: chequea expiración de sesión cada vez que la app vuelve
+  // a foreground (por ej. el usuario la minimizó y la reabre horas después).
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkSessionExpiry();
+    }
+  }
+
+  Future<void> _checkSessionExpiry() async {
+    final expirada = await StorageService.isSessionExpired();
+    if (expirada && mounted) {
+      await _logout();
+    }
   }
 
   void _onNotificationsChanged() {
@@ -232,9 +249,10 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  @override
+@override
   void dispose() {
     NotificationStore.instance.removeListener(_onNotificationsChanged);
+    WidgetsBinding.instance.removeObserver(this); // ✅ NUEVO
     super.dispose();
   }
 
