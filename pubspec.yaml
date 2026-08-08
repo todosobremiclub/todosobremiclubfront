@@ -2,7 +2,7 @@ name: todosobremiclub_app
 description: "A new Flutter project."
 publish_to: 'none'
 
-version: 3.0.0+22
+version: 3.0.0+23
 
 environment:
   sdk: ^3.11.1
@@ -47,6 +47,9 @@ dependencies:
   pdf: ^3.10.4
   printing: ^5.11.0
   path_provider: ^2.1.2
+
+  # ✅ Saber la versión/build instalada (para forzar actualización)
+  package_info_plus: ^8.0.0
 
 dev_dependencies:
   flutter_test:

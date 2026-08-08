@@ -23,4 +23,8 @@ class ApiConfig {
   static String get transferStartUrl => '$baseUrl$transferStart';
   static String get transferProofUrl => '$baseUrl$transferProof';
   static String get transferConfigUrl => '$baseUrl$transferConfig';
+
+  /// Config remota de la app (versión mínima para forzar actualización)
+  static const String appConfig = '/app/config';
+  static String get appConfigUrl => '$baseUrl$appConfig';
 }
