@@ -566,6 +566,7 @@ class _RecibosScreenState extends State<RecibosScreen>
 
     File? foto;
     bool enviando = false;
+    String? cuentaError;
 
     if (!mounted) return;
 
@@ -611,9 +612,10 @@ class _RecibosScreenState extends State<RecibosScreen>
                 return;
               }
               if (cuentaController.text.trim().isEmpty) {
-                _showSnack('Indicá la cuenta desde la que transferiste');
+                setDialogState(() => cuentaError = 'Este campo es obligatorio');
                 return;
               }
+              setDialogState(() => cuentaError = null);
 
               setDialogState(() => enviando = true);
 
@@ -688,10 +690,26 @@ class _RecibosScreenState extends State<RecibosScreen>
                       controller: cuentaController,
                       style: const TextStyle(color: Colors.black),
                       decoration: InputDecoration(
-                        labelText: 'Cuenta desde la que transferiste *',
+                        label: RichText(
+                          text: const TextSpan(
+                            style: TextStyle(color: Colors.black54, fontSize: 16),
+                            children: [
+                              TextSpan(text: 'Cuenta desde la que transferiste '),
+                              TextSpan(
+                                text: '*',
+                                style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold),
+                              ),
+                            ],
+                          ),
+                        ),
                         hintText: 'Ej: Juan Pérez, cuenta propia',
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        errorText: cuentaError,
+                        errorMaxLines: 2,
                       ),
+                      onChanged: (_) {
+                        if (cuentaError != null) setDialogState(() => cuentaError = null);
+                      },
                     ),
                     const SizedBox(height: 12),
                     TextField(
