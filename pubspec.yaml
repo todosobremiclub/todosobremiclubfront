@@ -2,7 +2,7 @@ name: todosobremiclub_app
 description: "A new Flutter project."
 publish_to: 'none'
 
-version: 3.0.0+24
+version: 3.0.1+25
 
 environment:
   sdk: ^3.11.1
