@@ -381,6 +381,13 @@ class AdminApiService {
     required String categoria,
     String? actividadAdicional,
     String? anioNacimiento,
+    // ✅ NUEVO: para ampliar la búsqueda a otras categorías/años (chicos que
+    // entrenan/juegan con más de una categoría). No cambian la categoría/año
+    // "principal" que se guarda en el evento, solo amplían quién aparece como
+    // candidato a convocado. Mismo endpoint y mismos nombres de parámetro que
+    // ya usa la web (ver src/routes/asistenciaRoutes.js del backend).
+    List<String>? categoriasAdicionales,
+    List<String>? aniosAdicionales,
   }) async {
     var path = '/club/$clubId/asistencia/socios-filtrados'
         '?actividad=${Uri.encodeQueryComponent(actividad)}'
@@ -391,6 +398,12 @@ class AdminApiService {
     }
     if (anioNacimiento != null && anioNacimiento.isNotEmpty) {
       path += '&anioNacimiento=${Uri.encodeQueryComponent(anioNacimiento)}';
+    }
+    if (categoriasAdicionales != null && categoriasAdicionales.isNotEmpty) {
+      path += '&categoriasAdicionales=${Uri.encodeQueryComponent(categoriasAdicionales.join(","))}';
+    }
+    if (aniosAdicionales != null && aniosAdicionales.isNotEmpty) {
+      path += '&aniosAdicionales=${Uri.encodeQueryComponent(aniosAdicionales.join(","))}';
     }
 
     final data = await get(token: token, path: path);
