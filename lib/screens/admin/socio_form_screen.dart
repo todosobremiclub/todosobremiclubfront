@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // ✅ NUEVO: para bloquear puntos en el DNI
 import 'package:image_picker/image_picker.dart';
 
 import '../../services/admin_api_service.dart';
@@ -252,7 +253,14 @@ class _SocioFormScreenState extends State<SocioFormScreen> {
             TextField(
               controller: _dniController,
               keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'DNI', border: OutlineInputBorder()),
+              // ✅ NUEVO: no permite escribir ni pegar puntos (ni ninguna otra
+              // cosa que no sea un número) en el DNI.
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              decoration: const InputDecoration(
+                labelText: 'DNI',
+                border: OutlineInputBorder(),
+                hintText: 'Sin puntos, ej: 20111222',
+              ),
             ),
             const SizedBox(height: 12),
             TextField(
