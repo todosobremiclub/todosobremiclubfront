@@ -64,8 +64,15 @@ kotlinOptions {
     buildTypes {
         getByName("release") {
             signingConfig = signingConfigs.getByName("release")
-            isMinifyEnabled = false
-            isShrinkResources = false
+            // ✅ Activa R8 (minificación + ofuscación del código Android)
+            // y el recorte de recursos no usados, para mejorar el puntaje
+            // de optimización en Play Console.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
         getByName("debug") {
             // sin cambios
