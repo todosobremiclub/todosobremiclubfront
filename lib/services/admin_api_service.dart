@@ -1,6 +1,23 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../core/config/api_config.dart';
+import '../core/services/session_service.dart';
+
+/// ✅ NUEVO: se lanza cuando el backend responde HTTP 401 (token de
+/// administrador vencido o inválido). SessionService ya se encargó de
+/// limpiar la sesión y volver al login antes de que esta excepción
+/// llegue a la pantalla que hizo el pedido, así que cualquier `catch`
+/// existente (que ya chequea `if (!mounted) return;` antes de tocar el
+/// context) simplemente no muestra nada, en vez de un error crudo.
+class SessionExpiredException implements Exception {
+  final String message;
+  const SessionExpiredException([
+    this.message = 'Tu sesión expiró. Iniciá sesión nuevamente.',
+  ]);
+
+  @override
+  String toString() => message;
+}
 
 /// Servicio para las acciones de administración dentro de la app
 /// (notificaciones, noticias, pagos, socios, asistencia, ingresos, gastos).
@@ -21,6 +38,13 @@ class AdminApiService {
       },
       body: jsonEncode(body),
     );
+
+    // ✅ NUEVO: token vencido/inválido -> logout automático + vuelta al
+    // login, en vez de dejar que la pantalla muestre "HTTP 401" crudo.
+    if (res.statusCode == 401) {
+      SessionService.forceAdminLogout();
+      throw const SessionExpiredException();
+    }
 
     Map<String, dynamic> data;
     try {
@@ -46,6 +70,13 @@ class AdminApiService {
       url,
       headers: {'Authorization': 'Bearer $token'},
     );
+
+    // ✅ NUEVO: token vencido/inválido -> logout automático + vuelta al
+    // login, en vez de dejar que la pantalla muestre "HTTP 401" crudo.
+    if (res.statusCode == 401) {
+      SessionService.forceAdminLogout();
+      throw const SessionExpiredException();
+    }
 
     Map<String, dynamic> data;
     try {

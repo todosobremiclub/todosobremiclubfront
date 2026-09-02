@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatf
 import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
 import 'core/services/storage_service.dart';
+import 'core/services/session_service.dart'; // ✅ NUEVO: logout automático por sesión vencida
 import 'core/config/api_config.dart';
 import 'core/config/app_theme.dart';
 import 'screens/login/login_screen.dart';
@@ -118,6 +119,7 @@ class MyApp extends StatelessWidget {
         // ✅ Caso ADMINISTRADOR: sin theme dinámico de club, va directo
         if (resultado?.admin != null) {
           return MaterialApp(
+            navigatorKey: SessionService.navigatorKey, // ✅ NUEVO
             title: 'Todo Sobre Mi Club - Admin',
             debugShowCheckedModeBanner: false,
             theme: ThemeData(useMaterial3: true),
@@ -133,6 +135,7 @@ class MyApp extends StatelessWidget {
             : ThemeData(useMaterial3: true);
 
         return MaterialApp(
+          navigatorKey: SessionService.navigatorKey, // ✅ NUEVO
           title: 'Todo Sobre Mi Club',
           debugShowCheckedModeBanner: false,
           theme: theme,
