@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-class NoticiaDetalleScreen extends StatelessWidget {
+class NoticiaDetalleScreen extends StatefulWidget {
   final Map<String, dynamic> noticia;
 
   const NoticiaDetalleScreen({
@@ -9,11 +9,55 @@ class NoticiaDetalleScreen extends StatelessWidget {
   });
 
   @override
+  State<NoticiaDetalleScreen> createState() => _NoticiaDetalleScreenState();
+}
+
+class _NoticiaDetalleScreenState extends State<NoticiaDetalleScreen> {
+  // ✅ Relación de aspecto (ancho/alto) de la imagen, resuelta de forma
+  // asíncrona. null mientras no se conoce todavía (se usa el
+  // comportamiento "clásico" mientras tanto).
+  double? _aspectRatio;
+  ImageStream? _imageStream;
+  late final ImageStreamListener _imageStreamListener;
+
+  @override
+  void initState() {
+    super.initState();
+    _imageStreamListener = ImageStreamListener(_onImageResolved);
+    final String imagenUrl = (widget.noticia['imagen_url'] ?? '') as String;
+    if (imagenUrl.isNotEmpty) {
+      _resolveAspectRatio(imagenUrl);
+    }
+  }
+
+  void _resolveAspectRatio(String imagenUrl) {
+    final stream = NetworkImage(imagenUrl).resolve(const ImageConfiguration());
+    _imageStream = stream;
+    stream.addListener(_imageStreamListener);
+  }
+
+  void _onImageResolved(ImageInfo info, bool synchronousCall) {
+    final w = info.image.width;
+    final h = info.image.height;
+    if (h > 0 && mounted) {
+      setState(() {
+        _aspectRatio = w / h;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _imageStream?.removeListener(_imageStreamListener);
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final String titulo = (noticia['titulo'] ?? '') as String;
-    final String texto = (noticia['texto'] ?? '') as String;
-    final String imagenUrl = (noticia['imagen_url'] ?? '') as String;
-    final String fecha = (noticia['fecha'] ?? '').toString();
+    final String titulo = (widget.noticia['titulo'] ?? '') as String;
+    final String texto = (widget.noticia['texto'] ?? '') as String;
+    final String imagenUrl = (widget.noticia['imagen_url'] ?? '') as String;
+    final String fecha = (widget.noticia['fecha'] ?? '').toString();
 
     String fechaLinda = '';
     if (fecha.isNotEmpty) {
@@ -32,6 +76,18 @@ class NoticiaDetalleScreen extends StatelessWidget {
     final hasImagen = imagenUrl.isNotEmpty;
     final topSafe = MediaQuery.of(context).padding.top;
 
+    // ✅ Si la imagen es más alta que ancha (retrato, ej: afiches de
+    // "citación"), agrandamos el header y usamos BoxFit.contain para que
+    // se vea COMPLETA, sin recortar. Si es apaisada/cuadrada (o todavía
+    // no se resolvió el tamaño), mantenemos el comportamiento clásico
+    // (280px + cover).
+    final bool esRetrato = _aspectRatio != null && _aspectRatio! < 0.9;
+    final double screenWidth = MediaQuery.of(context).size.width;
+    final double expandedHeightImg = esRetrato
+        ? (screenWidth / _aspectRatio!).clamp(280.0, 640.0)
+        : 280.0;
+    final BoxFit imgFit = esRetrato ? BoxFit.contain : BoxFit.cover;
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: CustomScrollView(
@@ -40,7 +96,7 @@ class NoticiaDetalleScreen extends StatelessWidget {
             pinned: true,
             stretch: true,
             backgroundColor: Colors.black,
-            expandedHeight: hasImagen ? 280 : 120,
+            expandedHeight: hasImagen ? expandedHeightImg : 120,
             leading: Padding(
               padding: const EdgeInsets.all(8),
               child: _BotonFlotante(
@@ -60,13 +116,17 @@ class NoticiaDetalleScreen extends StatelessWidget {
                         fit: StackFit.expand,
                         children: [
                           Positioned(
-                            top: topSafe + 28,
+                            top: esRetrato ? topSafe : topSafe + 28,
                             left: 0,
                             right: 0,
                             bottom: 0,
                             child: Image.network(
                               imagenUrl,
-                              fit: BoxFit.cover,
+                              // ✅ contain para retrato (no recorta,
+                              // se ve completa); cover para
+                              // horizontal/cuadrada (comportamiento
+                              // clásico, sin cambios).
+                              fit: imgFit,
                               errorBuilder: (_, __, ___) => Container(
                                 color: Colors.grey.shade300,
                                 child: const Center(

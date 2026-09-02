@@ -208,11 +208,16 @@ class _NoticiasScreenState extends State<NoticiasScreen>
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
                               if (imagenUrl.isNotEmpty)
-                                AspectRatio(
-                                  aspectRatio: 16 / 9,
+                                Container(
+                                  height: 220,
+                                  width: double.infinity,
+                                  color: Colors.grey.shade100,
                                   child: Image.network(
                                     imagenUrl,
-                                    fit: BoxFit.cover,
+                                    // ✅ contain (no cover): así se ve la imagen
+                                    // COMPLETA sin recortar, sea horizontal o
+                                    // vertical (ej: afiches/citaciones).
+                                    fit: BoxFit.contain,
                                     errorBuilder: (_, __, ___) => Container(
                                       color: Colors.grey.shade200,
                                       child: const Center(
@@ -227,7 +232,7 @@ class _NoticiasScreenState extends State<NoticiasScreen>
                                 )
                               else
                                 Container(
-                                  height: 180,
+                                  height: 220,
                                   color: Colors.grey.shade100,
                                   child: const Center(
                                     child: Icon(
