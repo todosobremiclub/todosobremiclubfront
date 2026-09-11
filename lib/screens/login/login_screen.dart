@@ -24,12 +24,49 @@ class _LoginScreenState extends State<LoginScreen> {
   // ✅ NUEVO: toggle socio / administrador
   bool _isAdminMode = false;
 
+  // ✅ NUEVO: "Recordarme" (disponible en login de socio Y de administrador,
+  // cada uno con sus propios datos guardados — ver StorageService)
+  bool _recordarme = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _cargarCredencialesRecordadas();
+  }
+
+  /// Carga las credenciales recordadas del modo actual (socio o admin).
+  /// Se llama al abrir la pantalla y cada vez que se cambia de modo.
+  Future<void> _cargarCredencialesRecordadas() async {
+    final recordadas = _isAdminMode
+        ? await StorageService.loadRememberedAdminCredentials()
+        : await StorageService.loadRememberedCredentials();
+
+    if (!mounted) return;
+
+    if (recordadas == null) {
+      setState(() => _recordarme = false);
+      return;
+    }
+
+    setState(() {
+      _numeroController.text = recordadas.usuario;
+      _dniController.text = recordadas.contrasena;
+      _recordarme = true;
+    });
+  }
+
   void _toggleAdminMode() {
     setState(() {
       _isAdminMode = !_isAdminMode;
       _numeroController.clear();
       _dniController.clear();
+      _recordarme = false;
     });
+
+    // Al cambiar de modo, si el modo al que se pasa tiene datos
+    // recordados, los mostramos (se habían borrado al limpiar los
+    // controllers arriba).
+    _cargarCredencialesRecordadas();
   }
 
   Future<void> _login() async {
@@ -77,6 +114,17 @@ class _LoginScreenState extends State<LoginScreen> {
         socio: socio,
         club: club,
       );
+
+      // ✅ NUEVO: "Recordarme" — guarda o borra usuario/contraseña según
+      // haya quedado marcado el checkbox, para prellenar el próximo login.
+      if (_recordarme) {
+        await StorageService.saveRememberedCredentials(
+          usuario: usuario,
+          contrasena: contrasena,
+        );
+      } else {
+        await StorageService.clearRememberedCredentials();
+      }
 
       final session = await StorageService.loadSession();
       if (session == null) {
@@ -155,6 +203,17 @@ class _LoginScreenState extends State<LoginScreen> {
         clubId: primerRol['club_id']?.toString() ?? '',
         clubName: primerRol['club_name']?.toString() ?? '',
       );
+
+      // ✅ NUEVO: "Recordarme" — igual que en el login de socio, guarda o
+      // borra email/contraseña del administrador según el checkbox.
+      if (_recordarme) {
+        await StorageService.saveRememberedAdminCredentials(
+          email: email,
+          password: password,
+        );
+      } else {
+        await StorageService.clearRememberedAdminCredentials();
+      }
 
       if (!mounted) return;
 
@@ -262,6 +321,27 @@ class _LoginScreenState extends State<LoginScreen> {
                     fillColor: Colors.black.withOpacity(0.04),
                   ),
                 ),
+
+                // ✅ NUEVO: "Recordarme" — disponible tanto para socio
+                // como para administrador (cada modo guarda lo suyo).
+                Row(
+                  children: [
+                    Checkbox(
+                      value: _recordarme,
+                      onChanged: (v) =>
+                          setState(() => _recordarme = v ?? false),
+                    ),
+                    GestureDetector(
+                      onTap: () =>
+                          setState(() => _recordarme = !_recordarme),
+                      child: const Text(
+                        'Recordarme',
+                        style: TextStyle(color: textMuted),
+                      ),
+                    ),
+                  ],
+                ),
+
                 const SizedBox(height: 30),
 
                 SizedBox(

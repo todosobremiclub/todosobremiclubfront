@@ -126,6 +126,99 @@ class StorageService {
     await prefs.remove(_kAdminClubId);
     await prefs.remove(_kAdminClubName);
   }
+
+  // ======================================================
+  // ✅ NUEVO: "Recordarme" (checkbox del login de socio)
+  // Guarda usuario/contraseña para prellenar el formulario la próxima
+  // vez que se muestre LoginScreen. No tiene nada que ver con mantener
+  // la sesión iniciada (eso ya lo hacen saveSession/loadSession): esto
+  // solo evita tener que volver a tipear los datos de acceso después de
+  // un logout manual o del auto-logout de 8hs.
+  // ⚠️ Se guarda en SharedPreferences sin cifrar, igual que el token de
+  // sesión (mismo nivel de protección que ya tiene hoy la app).
+  // ======================================================
+  static const _kRememberMe = 'app_remember_me';
+  static const _kRememberedUsuario = 'app_remembered_usuario';
+  static const _kRememberedContrasena = 'app_remembered_contrasena';
+
+  static Future<void> saveRememberedCredentials({
+    required String usuario,
+    required String contrasena,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_kRememberMe, true);
+    await prefs.setString(_kRememberedUsuario, usuario);
+    await prefs.setString(_kRememberedContrasena, contrasena);
+  }
+
+  static Future<void> clearRememberedCredentials() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_kRememberMe, false);
+    await prefs.remove(_kRememberedUsuario);
+    await prefs.remove(_kRememberedContrasena);
+  }
+
+  /// Devuelve null si el socio nunca activó "Recordarme" (o lo desactivó).
+  static Future<RememberedCredentials?> loadRememberedCredentials() async {
+    final prefs = await SharedPreferences.getInstance();
+    final activo = prefs.getBool(_kRememberMe) ?? false;
+    if (!activo) return null;
+
+    final usuario = prefs.getString(_kRememberedUsuario);
+    final contrasena = prefs.getString(_kRememberedContrasena);
+    if (usuario == null || contrasena == null) return null;
+
+    return RememberedCredentials(usuario: usuario, contrasena: contrasena);
+  }
+
+  // ======================================================
+  // ✅ NUEVO: "Recordarme" — misma idea que arriba, pero para el login
+  // de ADMINISTRADOR (email + contraseña). Se guarda aparte del de socio
+  // para que cambiar de modo en LoginScreen no mezcle ni pise los datos
+  // recordados del otro modo.
+  // ⚠️ Igual que el de socio: sin cifrar en SharedPreferences.
+  // ======================================================
+  static const _kAdminRememberMe = 'app_admin_remember_me';
+  static const _kAdminRememberedEmail = 'app_admin_remembered_email';
+  static const _kAdminRememberedPassword = 'app_admin_remembered_password';
+
+  static Future<void> saveRememberedAdminCredentials({
+    required String email,
+    required String password,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_kAdminRememberMe, true);
+    await prefs.setString(_kAdminRememberedEmail, email);
+    await prefs.setString(_kAdminRememberedPassword, password);
+  }
+
+  static Future<void> clearRememberedAdminCredentials() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_kAdminRememberMe, false);
+    await prefs.remove(_kAdminRememberedEmail);
+    await prefs.remove(_kAdminRememberedPassword);
+  }
+
+  /// Devuelve null si el administrador nunca activó "Recordarme" (o lo
+  /// desactivó).
+  static Future<RememberedCredentials?> loadRememberedAdminCredentials() async {
+    final prefs = await SharedPreferences.getInstance();
+    final activo = prefs.getBool(_kAdminRememberMe) ?? false;
+    if (!activo) return null;
+
+    final email = prefs.getString(_kAdminRememberedEmail);
+    final password = prefs.getString(_kAdminRememberedPassword);
+    if (email == null || password == null) return null;
+
+    return RememberedCredentials(usuario: email, contrasena: password);
+  }
+}
+
+class RememberedCredentials {
+  final String usuario;
+  final String contrasena;
+
+  RememberedCredentials({required this.usuario, required this.contrasena});
 }
 
 class AppSession {
