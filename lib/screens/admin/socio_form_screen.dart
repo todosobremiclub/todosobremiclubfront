@@ -38,6 +38,14 @@ class _SocioFormScreenState extends State<SocioFormScreen> {
   List<String> _categorias = [];
   List<String> _actividades = [];
 
+  // ✅ NUEVO: actividades adicionales del club (catálogo) y las que el socio
+  // tiene marcadas. Mismos campos que usa la web:
+  // tiene_actividades_adicionales (bool) y actividades_adicionales (array
+  // de nombres, se manda como JSON string).
+  List<String> _actividadesAdicionalesDisponibles = [];
+  bool _tieneActividadesAdicionales = false;
+  final Set<String> _actividadesAdicionalesSeleccionadas = {};
+
   bool _cargandoListas = true;
   bool _guardando = false;
 
@@ -57,10 +65,16 @@ class _SocioFormScreenState extends State<SocioFormScreen> {
         token: widget.token,
         clubId: widget.clubId,
       );
+      // ✅ NUEVO: catálogo de actividades adicionales del club.
+      final adicionales = await AdminApiService.getActividadesAdicionalesNombres(
+        token: widget.token,
+        clubId: widget.clubId,
+      );
       if (!mounted) return;
       setState(() {
         _categorias = categorias;
         _actividades = actividades;
+        _actividadesAdicionalesDisponibles = adicionales;
         _cargandoListas = false;
       });
     } catch (e) {
@@ -163,6 +177,14 @@ class _SocioFormScreenState extends State<SocioFormScreen> {
           if (_emailController.text.trim().isNotEmpty) 'email': _emailController.text.trim(),
           'es_menor': _esMenor,
           if (_esMenor) 'tutor_nombre': _tutorController.text.trim(),
+          // ✅ NUEVO: mismos campos y mismo formato que manda la web
+          // (backend/public/js/socios.js): tiene_actividades_adicionales
+          // como bool y actividades_adicionales como JSON string de un
+          // array de nombres.
+          'tiene_actividades_adicionales': _tieneActividadesAdicionales,
+          'actividades_adicionales': jsonEncode(
+            _tieneActividadesAdicionales ? _actividadesAdicionalesSeleccionadas.toList() : [],
+          ),
         },
       );
 
@@ -335,6 +357,36 @@ class _SocioFormScreenState extends State<SocioFormScreen> {
                   border: OutlineInputBorder(),
                 ),
               ),
+            ],
+            // ✅ NUEVO: actividades adicionales, solo si el club tiene
+            // catálogo cargado (mismo criterio que la web: el bloque solo
+            // tiene sentido si hay adicionales configurados).
+            if (_actividadesAdicionalesDisponibles.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('¿Tiene actividades adicionales?'),
+                value: _tieneActividadesAdicionales,
+                onChanged: (v) => setState(() => _tieneActividadesAdicionales = v),
+              ),
+              if (_tieneActividadesAdicionales) ...[
+                const SizedBox(height: 4),
+                ..._actividadesAdicionalesDisponibles.map(
+                  (nombre) => CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    controlAffinity: ListTileControlAffinity.leading,
+                    title: Text(nombre),
+                    value: _actividadesAdicionalesSeleccionadas.contains(nombre),
+                    onChanged: (v) => setState(() {
+                      if (v == true) {
+                        _actividadesAdicionalesSeleccionadas.add(nombre);
+                      } else {
+                        _actividadesAdicionalesSeleccionadas.remove(nombre);
+                      }
+                    }),
+                  ),
+                ),
+              ],
             ],
             const SizedBox(height: 24),
             ElevatedButton(

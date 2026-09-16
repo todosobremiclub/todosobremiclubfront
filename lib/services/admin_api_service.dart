@@ -115,6 +115,10 @@ class AdminApiService {
     String destinoTipo = 'todos',
     String? destinoValor1,
     String? destinoValor2,
+    // ✅ NUEVO: canal de envío ('app' | 'whatsapp' | 'ambos'). El backend lo
+    // espera en el nivel raíz del body (igual que hace la web en
+    // backend/public/js/notificaciones.js), no anidado en "data".
+    String canal = 'app',
   }) async {
     await post(
       token: token,
@@ -131,6 +135,8 @@ class AdminApiService {
           if (destinoValor2 != null && destinoValor2.isNotEmpty)
             'destino_valor2': destinoValor2,
         },
+        // ✅ NUEVO
+        'canal': canal,
       },
     );
   }

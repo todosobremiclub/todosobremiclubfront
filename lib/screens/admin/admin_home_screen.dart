@@ -213,7 +213,13 @@ _Seccion(
             titulo: 'Enviar notificación',
             icono: Icons.notifications_active_outlined,
             visible: _puede(['admin', 'comunicacion', 'profesor']),
-            onTap: () => _abrir(NotificacionFormScreen(token: token, clubId: clubId)),
+            onTap: () => _abrir(NotificacionFormScreen(
+              token: token,
+              clubId: clubId,
+              // ✅ NUEVO: solo se muestra el selector de canal si el club
+              // tiene contratado el add-on de WhatsApp.
+              whatsappHabilitado: _club?.whatsappHabilitado ?? false,
+            )),
           ),
           _AccionAdmin(
             titulo: 'Agenda',

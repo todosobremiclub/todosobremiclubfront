@@ -13,6 +13,12 @@ class Club {
   // 👉 Instagram
   final String? instagramUrl;
 
+  // ✅ NUEVO: indica si el club tiene contratado el add-on de WhatsApp.
+  // Se usa para mostrar/ocultar los selectores de canal (app/WhatsApp/ambos)
+  // en notificaciones y bienvenidas, igual que en el panel web
+  // (window.currentClub?.whatsapp_habilitado === true).
+  final bool whatsappHabilitado;
+
   Club({
     required this.id,
     required this.nombre,
@@ -22,6 +28,7 @@ class Club {
     this.colorAccent,
     this.instagramUrl,
     required this.transferenciaHabilitada,
+    this.whatsappHabilitado = false,
   });
 
   factory Club.fromJson(Map<String, dynamic> json) {
@@ -47,6 +54,10 @@ class Club {
       // ✅ 🔥 ESTE ES EL FIX IMPORTANTE
       transferenciaHabilitada:
           json['transferencia_habilitada'] == true,
+
+      // ✅ NUEVO
+      whatsappHabilitado:
+          json['whatsapp_habilitado'] == true,
     );
   }
 
@@ -60,6 +71,7 @@ class Club {
       'color_accent': colorAccent,
       'instagram_url': instagramUrl,
       'transferencia_habilitada': transferenciaHabilitada,
+      'whatsapp_habilitado': whatsappHabilitado,
     };
   }
 }

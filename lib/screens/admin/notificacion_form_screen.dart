@@ -5,11 +5,16 @@ import '../../services/admin_api_service.dart';
 class NotificacionFormScreen extends StatefulWidget {
   final String token;
   final String clubId;
+  // ✅ NUEVO: si el club tiene contratado el add-on de WhatsApp. Controla si
+  // se muestra el selector de canal (igual que en la web,
+  // window.currentClub?.whatsapp_habilitado === true).
+  final bool whatsappHabilitado;
 
   const NotificacionFormScreen({
     super.key,
     required this.token,
     required this.clubId,
+    this.whatsappHabilitado = false,
   });
 
   @override
@@ -32,6 +37,16 @@ class _NotificacionFormScreenState extends State<NotificacionFormScreen> {
   String? _valorActividad;
   String? _valorCategoria;
   int? _valorAnio;
+
+  // ✅ NUEVO: canal de envío ('app' | 'ambos' | 'whatsapp'), igual que el
+  // selector "notiCanal" de la web (backend/public/sections/notificaciones.html).
+  String _canal = 'app';
+
+  static const Map<String, String> _canalLabels = {
+    'app': 'Solo notificación en la app',
+    'ambos': 'App + WhatsApp',
+    'whatsapp': 'Solo WhatsApp',
+  };
 
   static const Map<String, String> _destinoLabels = {
     'todos': 'Todos los socios',
@@ -150,6 +165,9 @@ class _NotificacionFormScreenState extends State<NotificacionFormScreen> {
         destinoTipo: _destinoTipo,
         destinoValor1: valor1,
         destinoValor2: valor2,
+        // ✅ NUEVO: si el club no tiene WhatsApp habilitado, se fuerza 'app'
+        // sin importar el estado interno del selector (por las dudas).
+        canal: widget.whatsappHabilitado ? _canal : 'app',
       );
 
       if (!mounted) return;
@@ -296,6 +314,25 @@ class _NotificacionFormScreenState extends State<NotificacionFormScreen> {
               'La notificación se enviará solo a los socios que cumplan el criterio seleccionado.',
               style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
             ),
+            // ✅ NUEVO: selector de canal, solo visible si el club tiene el
+            // add-on de WhatsApp (mismo criterio que
+            // #notificaciones-canal-wrap en la web).
+            if (widget.whatsappHabilitado) ...[
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                value: _canal,
+                decoration: const InputDecoration(labelText: 'Enviar por', border: OutlineInputBorder()),
+                items: _canalLabels.entries
+                    .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))
+                    .toList(),
+                onChanged: (v) => setState(() => _canal = v ?? 'app'),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'El envío por WhatsApp respeta el límite mensual de mensajes configurado para este club.',
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+              ),
+            ],
             const SizedBox(height: 24),
             ElevatedButton(
               onPressed: _enviando ? null : _enviar,
