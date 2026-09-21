@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/config/api_config.dart';
 import '../../core/services/storage_service.dart';
@@ -24,6 +25,10 @@ class _RecibosScreenState extends State<RecibosScreen>
   late Future<List<_ReciboPago>> _future;
   bool _transferBusy = false;
   bool _transferenciaHabilitada = false;
+
+  // ✅ NUEVO: pago automático por Mercado Pago
+  bool _mpBusy = false;
+  bool _mpHabilitada = false;
 
   @override
   void initState() {
@@ -67,12 +72,87 @@ class _RecibosScreenState extends State<RecibosScreen>
       final data = jsonDecode(res.body);
 
       if (res.statusCode == 200 && data['ok'] == true) {
+        // ✅ NUEVO: el backend ahora informa payment_mode ('ninguno' |
+        // 'transferencia_manual' | 'mercadopago_auto'), que es la fuente de
+        // verdad de qué botón mostrar. transferencia_habilitada se mantiene
+        // como respaldo por compatibilidad con versiones viejas del backend.
+        final paymentMode = data['payment_mode']?.toString();
         setState(() {
-          _transferenciaHabilitada = data['transferencia_habilitada'] == true;
+          if (paymentMode != null && paymentMode.isNotEmpty) {
+            _transferenciaHabilitada = paymentMode == 'transferencia_manual';
+            _mpHabilitada = paymentMode == 'mercadopago_auto';
+          } else {
+            _transferenciaHabilitada = data['transferencia_habilitada'] == true;
+            _mpHabilitada = false;
+          }
         });
       }
     } catch (_) {
-      // si falla, seguimos sin habilitar transferencia
+      // si falla, seguimos sin habilitar transferencia ni Mercado Pago
+    }
+  }
+
+  // ✅ NUEVO: genera el link de pago de Mercado Pago para ese mes y lo abre
+  // en el navegador externo. El pago se acredita solo vía webhook; al volver
+  // a la app (didChangeAppLifecycleState) se recargan los recibos.
+  Future<void> _pagarConMercadoPago(_ReciboPago recibo) async {
+    if (_mpBusy) return;
+    setState(() => _mpBusy = true);
+
+    try {
+      final token = widget.session.token;
+      final clubId = widget.session.clubObj.id;
+
+      final res = await http.post(
+        Uri.parse(ApiConfig.mpPreferenceUrl(clubId)),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'anio': recibo.anio,
+          'meses': [recibo.mes],
+          'monto_por_mes': recibo.monto,
+        }),
+      );
+
+      final data = jsonDecode(res.body);
+
+      if (res.statusCode != 200 || data['ok'] != true) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(data['error']?.toString() ?? 'No se pudo generar el pago')),
+          );
+        }
+        return;
+      }
+
+      final initPoint = data['initPoint']?.toString();
+      if (initPoint == null || initPoint.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No se pudo obtener el link de pago')),
+          );
+        }
+        return;
+      }
+
+      final uri = Uri.parse(initPoint);
+      final abierto = await launchUrl(uri, mode: LaunchMode.externalApplication);
+
+      if (!abierto && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No se pudo abrir Mercado Pago')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al iniciar el pago: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _mpBusy = false);
     }
   }
 
@@ -282,6 +362,36 @@ class _RecibosScreenState extends State<RecibosScreen>
                         ),
                       ],
                     ),
+                    // ✅ NUEVO: pago automático por Mercado Pago (modo
+                    // 'mercadopago_auto' del club). Excluyente con el bloque
+                    // de transferencia manual de abajo — el backend nunca
+                    // habilita los dos modos a la vez para un mismo club.
+                    if (recibo.pendiente && _mpHabilitada == true) ...[
+                      const SizedBox(height: 10),
+                      if (!recibo.habilitado) ...[
+                        Text(
+                          'Para pagar este mes, primero pagá los meses anteriores.',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.black.withOpacity(0.6),
+                          ),
+                        ),
+                      ] else ...[
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: _mpBusy ? null : () => _pagarConMercadoPago(recibo),
+                            child: _mpBusy
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : const Text('Pagar con Mercado Pago'),
+                          ),
+                        ),
+                      ],
+                    ],
                     if (recibo.pendiente && _transferenciaHabilitada == true) ...[
                       const SizedBox(height: 10),
                       if (!recibo.habilitado) ...[

@@ -19,10 +19,15 @@ class ApiConfig {
   static const String transferProof = '/app/payments/transfer/proof';
   static const String transferConfig = '/app/club/transferencia-config';
 
+  /// Mercado Pago - App Socio
+  /// :clubId se reemplaza en tiempo de ejecución
+  static const String mpPreference = '/mp/preference';
+
   /// URLs completas
   static String get transferStartUrl => '$baseUrl$transferStart';
   static String get transferProofUrl => '$baseUrl$transferProof';
   static String get transferConfigUrl => '$baseUrl$transferConfig';
+  static String mpPreferenceUrl(String clubId) => '$baseUrl$mpPreference/$clubId';
 
   /// Config remota de la app (versión mínima para forzar actualización)
   static const String appConfig = '/app/config';
