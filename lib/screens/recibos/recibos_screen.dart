@@ -120,6 +120,7 @@ class _RecibosScreenState extends State<RecibosScreen>
       final fechaIso = (p['fecha_pago'] ?? p['fecha'] ?? '') as String;
       final cuenta = (p['cuenta'] ?? '').toString();
       final bool pendienteApi = p['pendiente'] == true;
+      final bool habilitadoApi = p['habilitado'] != false; // ✅ NUEVO: default true
 
       return _ReciboPago(
         anio: anio,
@@ -128,6 +129,7 @@ class _RecibosScreenState extends State<RecibosScreen>
         fechaPagoIso: fechaIso,
         cuenta: cuenta,
         pendiente: pendienteApi,
+        habilitado: habilitadoApi,
         estadoTransferencia: p['estado_transferencia'],
         motivoRechazo: p['motivo_rechazo'],
       );
@@ -282,7 +284,17 @@ class _RecibosScreenState extends State<RecibosScreen>
                     ),
                     if (recibo.pendiente && _transferenciaHabilitada == true) ...[
                       const SizedBox(height: 10),
-                      if (recibo.estadoTransferencia == 'rechazado') ...[
+                      if (!recibo.habilitado) ...[
+                        // ✅ NUEVO: pendiente pero bloqueado — hay meses
+                        // anteriores sin informar todavía.
+                        Text(
+                          'Para informar este pago, primero informá el pago de los meses anteriores.',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.black.withOpacity(0.6),
+                          ),
+                        ),
+                      ] else if (recibo.estadoTransferencia == 'rechazado') ...[
                         Container(
                           width: double.infinity,
                           padding: const EdgeInsets.all(10),
@@ -905,6 +917,7 @@ class _ReciboPago {
   final String fechaPagoIso;
   final String? cuenta;
   final bool pendiente;
+  final bool habilitado; // ✅ NUEVO: false = pendiente pero bloqueado (hay meses anteriores sin informar)
   final String? estadoTransferencia;
   final String? motivoRechazo;
 
@@ -915,6 +928,7 @@ class _ReciboPago {
     required this.fechaPagoIso,
     this.cuenta,
     this.pendiente = false,
+    this.habilitado = true,
     this.estadoTransferencia,
     this.motivoRechazo,
   });
