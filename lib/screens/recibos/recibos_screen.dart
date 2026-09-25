@@ -73,14 +73,17 @@ class _RecibosScreenState extends State<RecibosScreen>
 
       if (res.statusCode == 200 && data['ok'] == true) {
         // ✅ NUEVO: el backend ahora informa payment_mode ('ninguno' |
-        // 'transferencia_manual' | 'mercadopago_auto'), que es la fuente de
-        // verdad de qué botón mostrar. transferencia_habilitada se mantiene
-        // como respaldo por compatibilidad con versiones viejas del backend.
+        // 'transferencia_manual' | 'mercadopago_auto' | 'ambos'), que es la
+        // fuente de verdad de qué botón(es) mostrar. Con 'ambos' se habilitan
+        // los dos flags a la vez y se muestran los dos botones apilados.
+        // transferencia_habilitada se mantiene como respaldo por
+        // compatibilidad con versiones viejas del backend.
         final paymentMode = data['payment_mode']?.toString();
         setState(() {
           if (paymentMode != null && paymentMode.isNotEmpty) {
-            _transferenciaHabilitada = paymentMode == 'transferencia_manual';
-            _mpHabilitada = paymentMode == 'mercadopago_auto';
+            _transferenciaHabilitada =
+                paymentMode == 'transferencia_manual' || paymentMode == 'ambos';
+            _mpHabilitada = paymentMode == 'mercadopago_auto' || paymentMode == 'ambos';
           } else {
             _transferenciaHabilitada = data['transferencia_habilitada'] == true;
             _mpHabilitada = false;
@@ -362,10 +365,10 @@ class _RecibosScreenState extends State<RecibosScreen>
                         ),
                       ],
                     ),
-                    // ✅ NUEVO: pago automático por Mercado Pago (modo
-                    // 'mercadopago_auto' del club). Excluyente con el bloque
-                    // de transferencia manual de abajo — el backend nunca
-                    // habilita los dos modos a la vez para un mismo club.
+                    // ✅ Pago automático por Mercado Pago (modo
+                    // 'mercadopago_auto' o 'ambos' del club). Con 'ambos' este
+                    // bloque y el de transferencia de abajo se muestran los
+                    // dos, uno debajo del otro, y el socio elige cuál usar.
                     if (recibo.pendiente && _mpHabilitada == true) ...[
                       const SizedBox(height: 10),
                       if (!recibo.habilitado) ...[

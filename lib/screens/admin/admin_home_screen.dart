@@ -81,7 +81,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   // solo_lectura        -> sin acceso a la app
   // finanzas            -> pagos, ingresos, gastos
   // comunicacion        -> noticias y notificaciones
-  // profesor            -> noticias, notificaciones, buscar socio, asistencia
+  // profesor            -> noticias, notificaciones, buscar socio, asistencia, agenda
   // asistencias         -> registrar asistencias
   // ======================================================
   bool _puede(List<String> rolesPermitidos) {
@@ -224,7 +224,9 @@ _Seccion(
           _AccionAdmin(
             titulo: 'Agenda',
             icono: Icons.event_outlined,
-            visible: _puede(['admin', 'comunicacion']),
+            // ✅ El profesor también puede ver la Agenda (actividades del
+            // club + cumpleaños) y cargar sus actividades.
+            visible: _puede(['admin', 'comunicacion', 'profesor']),
             onTap: () => _abrir(AgendaScreen(token: token, clubId: clubId)),
           ),
         ],
