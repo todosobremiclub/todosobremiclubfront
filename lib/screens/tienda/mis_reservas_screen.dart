@@ -42,10 +42,27 @@ class _MisReservasScreenState extends State<MisReservasScreen> {
     await _future;
   }
 
+  // ✅ Formatea con separador de miles "." y decimales con "," (ej: $25.000,00).
   String _formatPrecio(dynamic precio) {
     final n = num.tryParse((precio ?? '').toString());
     if (n == null) return '—';
-    return '\$${n.toStringAsFixed(2)}';
+
+    final negativo = n < 0;
+    final centavos = (n.abs() * 100).round();
+    final entero = centavos ~/ 100;
+    final decimales = (centavos % 100).toString().padLeft(2, '0');
+
+    final enteroStr = entero.toString();
+    final buffer = StringBuffer();
+    for (var i = 0; i < enteroStr.length; i++) {
+      final posDesdeElFinal = enteroStr.length - i;
+      buffer.write(enteroStr[i]);
+      if (posDesdeElFinal > 1 && posDesdeElFinal % 3 == 1) {
+        buffer.write('.');
+      }
+    }
+
+    return '\$${negativo ? '-' : ''}${buffer.toString()},$decimales';
   }
 
   String _formatFecha(String? iso) {

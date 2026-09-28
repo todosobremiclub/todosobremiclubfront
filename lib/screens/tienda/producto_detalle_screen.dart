@@ -30,10 +30,29 @@ class _ProductoDetalleScreenState extends State<ProductoDetalleScreen> {
   int get _stock =>
       int.tryParse((widget.producto['stock'] ?? 0).toString()) ?? 0;
 
+  // ✅ Formatea con separador de miles "." y decimales con "," (ej: $25.000,00),
+  // sin depender de datos de locale de `intl` (evita romper si el paquete no
+  // trae "es_AR" cargado).
   String _formatPrecio(dynamic precio) {
     final n = num.tryParse((precio ?? '').toString());
     if (n == null) return '—';
-    return '\$${n.toStringAsFixed(2)}';
+
+    final negativo = n < 0;
+    final centavos = (n.abs() * 100).round();
+    final entero = centavos ~/ 100;
+    final decimales = (centavos % 100).toString().padLeft(2, '0');
+
+    final enteroStr = entero.toString();
+    final buffer = StringBuffer();
+    for (var i = 0; i < enteroStr.length; i++) {
+      final posDesdeElFinal = enteroStr.length - i;
+      buffer.write(enteroStr[i]);
+      if (posDesdeElFinal > 1 && posDesdeElFinal % 3 == 1) {
+        buffer.write('.');
+      }
+    }
+
+    return '\$${negativo ? '-' : ''}${buffer.toString()},$decimales';
   }
 
   Future<void> _reservar() async {
@@ -204,21 +223,29 @@ class _ProductoDetalleScreenState extends State<ProductoDetalleScreen> {
                     const SizedBox(height: 8),
                     Row(
                       children: [
-                        IconButton(
-                          onPressed: _cantidad > 1
-                              ? () => setState(() => _cantidad--)
-                              : null,
-                          icon: const Icon(Icons.remove_circle_outline),
+                        _CantidadBoton(
+                          icon: Icons.remove,
+                          habilitado: _cantidad > 1,
+                          color: scheme.primary,
+                          onTap: () => setState(() => _cantidad--),
                         ),
-                        Text(
-                          '$_cantidad',
-                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        SizedBox(
+                          width: 44,
+                          child: Text(
+                            '$_cantidad',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black,
+                            ),
+                          ),
                         ),
-                        IconButton(
-                          onPressed: _cantidad < _stock
-                              ? () => setState(() => _cantidad++)
-                              : null,
-                          icon: const Icon(Icons.add_circle_outline),
+                        _CantidadBoton(
+                          icon: Icons.add,
+                          habilitado: _cantidad < _stock,
+                          color: scheme.primary,
+                          onTap: () => setState(() => _cantidad++),
                         ),
                       ],
                     ),
@@ -242,21 +269,48 @@ class _ProductoDetalleScreenState extends State<ProductoDetalleScreen> {
                             : const Text('Reservar'),
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    const Text(
-                      'Sin pago online: el producto se paga y se retira en el club.',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.black45,
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
                   ],
                 ],
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ✅ NUEVO: botón +/- de cantidad con borde propio, siempre visible
+// (reemplaza a los IconButton sueltos, que en algunos temas quedaban con
+// el ícono "+" prácticamente invisible por el color por defecto).
+class _CantidadBoton extends StatelessWidget {
+  final IconData icon;
+  final bool habilitado;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _CantidadBoton({
+    required this.icon,
+    required this.habilitado,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorActivo = habilitado ? color : Colors.black26;
+
+    return InkWell(
+      onTap: habilitado ? onTap : null,
+      borderRadius: BorderRadius.circular(999),
+      child: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: colorActivo, width: 1.4),
+        ),
+        child: Icon(icon, size: 20, color: colorActivo),
       ),
     );
   }
