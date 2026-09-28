@@ -60,6 +60,71 @@ class AdminApiService {
     return data;
   }
 
+  static Future<Map<String, dynamic>> put({
+    required String token,
+    required String path,
+    required Map<String, dynamic> body,
+  }) async {
+    final url = Uri.parse('${ApiConfig.baseUrl}$path');
+
+    final res = await http.put(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode(body),
+    );
+
+    if (res.statusCode == 401) {
+      SessionService.forceAdminLogout();
+      throw const SessionExpiredException();
+    }
+
+    Map<String, dynamic> data;
+    try {
+      data = jsonDecode(res.body) as Map<String, dynamic>;
+    } catch (_) {
+      throw Exception('Respuesta inválida del servidor (HTTP ${res.statusCode})');
+    }
+
+    if (res.statusCode < 200 || res.statusCode >= 300 || data['ok'] != true) {
+      throw Exception(data['error'] ?? 'Error en la operación (HTTP ${res.statusCode})');
+    }
+
+    return data;
+  }
+
+  static Future<Map<String, dynamic>> delete({
+    required String token,
+    required String path,
+  }) async {
+    final url = Uri.parse('${ApiConfig.baseUrl}$path');
+
+    final res = await http.delete(
+      url,
+      headers: {'Authorization': 'Bearer $token'},
+    );
+
+    if (res.statusCode == 401) {
+      SessionService.forceAdminLogout();
+      throw const SessionExpiredException();
+    }
+
+    Map<String, dynamic> data;
+    try {
+      data = jsonDecode(res.body) as Map<String, dynamic>;
+    } catch (_) {
+      throw Exception('Respuesta inválida del servidor (HTTP ${res.statusCode})');
+    }
+
+    if (res.statusCode < 200 || res.statusCode >= 300 || data['ok'] != true) {
+      throw Exception(data['error'] ?? 'Error en la operación (HTTP ${res.statusCode})');
+    }
+
+    return data;
+  }
+
   static Future<Map<String, dynamic>> get({
     required String token,
     required String path,
@@ -283,6 +348,41 @@ class AdminApiService {
     final data = await get(token: token, path: '/club/$clubId/config/categorias');
     final items = (data['categorias'] as List?) ?? [];
     return items.map((c) => c['nombre'].toString()).toList();
+  }
+
+  // ======================================================
+  // Cascada Actividad -> Categoría -> Año de nacimiento (asistencia)
+  // Mismos endpoints que usa la web en backend/public/js/asistencia.js
+  // y backend/public/js/reportes.js: solo devuelven categorías/años que
+  // efectivamente tienen socios activos cargados en esa combinación.
+  // ======================================================
+  static Future<List<String>> getCategoriasPorActividad({
+    required String token,
+    required String clubId,
+    required String actividad,
+  }) async {
+    final data = await get(
+      token: token,
+      path: '/club/$clubId/asistencia/categorias-por-actividad?actividad=${Uri.encodeQueryComponent(actividad)}',
+    );
+    final categorias = (data['categorias'] as List?) ?? [];
+    return categorias.map((c) => c.toString()).toList();
+  }
+
+  static Future<List<int>> getAniosPorActividadCategoria({
+    required String token,
+    required String clubId,
+    required String actividad,
+    required String categoria,
+  }) async {
+    final data = await get(
+      token: token,
+      path: '/club/$clubId/asistencia/anios-por-actividad-categoria'
+          '?actividad=${Uri.encodeQueryComponent(actividad)}'
+          '&categoria=${Uri.encodeQueryComponent(categoria)}',
+    );
+    final anios = (data['anios'] as List?) ?? [];
+    return anios.map((a) => int.parse(a.toString())).toList();
   }
 
   static Future<List<Map<String, dynamic>>> getTiposIngreso({
@@ -648,5 +748,197 @@ class AdminApiService {
         if (motivo != null && motivo.isNotEmpty) 'motivo': motivo,
       },
     );
+  }
+
+  // ======================================================
+  // Reporte de asistencia (mismos endpoints que usa la web en
+  // backend/public/js/reportes.js, sección "Asistencia a Entrenamientos y
+  // Partidos").
+  // ======================================================
+
+  // ======================================================
+  // Cascada Actividad -> Categoría -> Año para el REPORTE de asistencia.
+  // A diferencia de getCategoriasPorActividad/getAniosPorActividadCategoria
+  // (que se basan en la tabla socios, para "Tomar asistencia"), estos
+  // endpoints se basan en la tabla asistencia_eventos: solo devuelven
+  // combinaciones que ya tienen algún entrenamiento o partido cargado.
+  // Mismos endpoints que usa la web en backend/public/js/reportes.js.
+  // ======================================================
+  static Future<List<String>> getActividadesDisponiblesAsistencia({
+    required String token,
+    required String clubId,
+  }) async {
+    final data = await get(
+      token: token,
+      path: '/club/$clubId/reportes/asistencia/actividades-disponibles',
+    );
+    final actividades = (data['actividades'] as List?) ?? [];
+    return actividades.map((a) => a.toString()).toList();
+  }
+
+  static Future<List<String>> getCategoriasDisponiblesAsistencia({
+    required String token,
+    required String clubId,
+    required String actividad,
+  }) async {
+    final data = await get(
+      token: token,
+      path: '/club/$clubId/reportes/asistencia/categorias-disponibles'
+          '?actividad=${Uri.encodeQueryComponent(actividad)}',
+    );
+    final categorias = (data['categorias'] as List?) ?? [];
+    return categorias.map((c) => c.toString()).toList();
+  }
+
+  static Future<List<int>> getAniosDisponiblesAsistencia({
+    required String token,
+    required String clubId,
+    required String actividad,
+    required String categoria,
+  }) async {
+    final data = await get(
+      token: token,
+      path: '/club/$clubId/reportes/asistencia/anios-disponibles'
+          '?actividad=${Uri.encodeQueryComponent(actividad)}'
+          '&categoria=${Uri.encodeQueryComponent(categoria)}',
+    );
+    final anios = (data['anios'] as List?) ?? [];
+    return anios.map((a) => int.parse(a.toString())).toList();
+  }
+
+  /// GET /club/:clubId/reportes/asistencia/matriz-mes
+  /// Devuelve, para el mes/actividad/categoría pedidos, la lista de
+  /// eventos (entrenamientos/partidos) y, por cada socio, sus presencias
+  /// (mapa eventoId -> presente/ausente).
+  static Future<Map<String, dynamic>> getAsistenciaMatrizMes({
+    required String token,
+    required String clubId,
+    required int anio,
+    required int mes,
+    required String actividad,
+    required String categoria,
+    String? actividadAdicional,
+    String? anioNacimiento,
+  }) async {
+    var path = '/club/$clubId/reportes/asistencia/matriz-mes'
+        '?anio=$anio&mes=$mes'
+        '&actividad=${Uri.encodeQueryComponent(actividad)}'
+        '&categoria=${Uri.encodeQueryComponent(categoria)}';
+    if (actividadAdicional != null && actividadAdicional.isNotEmpty) {
+      path += '&actividadAdicional=${Uri.encodeQueryComponent(actividadAdicional)}';
+    }
+    if (anioNacimiento != null && anioNacimiento.isNotEmpty) {
+      path += '&anioNacimiento=${Uri.encodeQueryComponent(anioNacimiento)}';
+    }
+
+    final data = await get(token: token, path: path);
+    final eventos = ((data['eventos'] as List?) ?? [])
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
+    final socios = ((data['socios'] as List?) ?? [])
+        .map((s) => Map<String, dynamic>.from(s))
+        .toList();
+    return {'eventos': eventos, 'socios': socios};
+  }
+
+  /// GET /club/:clubId/reportes/asistencia/evento/:eventoId
+  static Future<Map<String, dynamic>> getAsistenciaDetalleEvento({
+    required String token,
+    required String clubId,
+    required String eventoId,
+  }) async {
+    final data = await get(
+      token: token,
+      path: '/club/$clubId/reportes/asistencia/evento/$eventoId',
+    );
+    return {
+      'evento': Map<String, dynamic>.from(data['evento'] ?? {}),
+      'detalle': ((data['detalle'] as List?) ?? [])
+          .map((d) => Map<String, dynamic>.from(d))
+          .toList(),
+    };
+  }
+
+  /// DELETE /club/:clubId/asistencia/:eventoId
+  static Future<void> eliminarEventoAsistencia({
+    required String token,
+    required String clubId,
+    required String eventoId,
+  }) async {
+    await delete(token: token, path: '/club/$clubId/asistencia/$eventoId');
+  }
+
+  /// POST /club/:clubId/asistencia/:eventoId/socio
+  /// Agrega a un socio que faltó cargar en un evento ya guardado.
+  static Future<void> agregarSocioAEventoAsistencia({
+    required String token,
+    required String clubId,
+    required String eventoId,
+    required String socioId,
+    bool presente = true,
+  }) async {
+    await post(
+      token: token,
+      path: '/club/$clubId/asistencia/$eventoId/socio',
+      body: {'socioId': socioId, 'presente': presente},
+    );
+  }
+
+  /// DELETE /club/:clubId/asistencia/:eventoId/socio/:socioId
+  /// Quita a un socio puntual (convocado o invitado) de un evento ya
+  /// guardado, sin eliminar el evento completo.
+  static Future<void> quitarSocioDeEventoAsistencia({
+    required String token,
+    required String clubId,
+    required String eventoId,
+    required String socioId,
+  }) async {
+    await delete(token: token, path: '/club/$clubId/asistencia/$eventoId/socio/$socioId');
+  }
+
+  /// PUT /club/:clubId/asistencia/:eventoId/detalle
+  /// Guarda de una sola vez todos los cambios pendientes del detalle de
+  /// un evento: socios a quitar y socios a agregar o cuya condición
+  /// presente/ausente cambió.
+  static Future<void> guardarCambiosDetalleEventoAsistencia({
+    required String token,
+    required String clubId,
+    required String eventoId,
+    required List<String> quitar,
+    required List<Map<String, dynamic>> agregarOModificar,
+  }) async {
+    await put(
+      token: token,
+      path: '/club/$clubId/asistencia/$eventoId/detalle',
+      body: {'quitar': quitar, 'agregarOModificar': agregarOModificar},
+    );
+  }
+
+  /// GET /club/:clubId/reportes/asistencia/socio?search=...
+  static Future<List<Map<String, dynamic>>> buscarSocioAsistReporte({
+    required String token,
+    required String clubId,
+    required String query,
+  }) async {
+    final data = await get(
+      token: token,
+      path: '/club/$clubId/reportes/asistencia/socio?search=${Uri.encodeQueryComponent(query)}',
+    );
+    final socios = (data['socios'] as List?) ?? [];
+    return socios.map((s) => Map<String, dynamic>.from(s)).toList();
+  }
+
+  /// GET /club/:clubId/reportes/asistencia/socio/:socioId/historial
+  static Future<List<Map<String, dynamic>>> getHistorialAsistSocio({
+    required String token,
+    required String clubId,
+    required String socioId,
+  }) async {
+    final data = await get(
+      token: token,
+      path: '/club/$clubId/reportes/asistencia/socio/$socioId/historial',
+    );
+    final historial = (data['historial'] as List?) ?? [];
+    return historial.map((h) => Map<String, dynamic>.from(h)).toList();
   }
 }

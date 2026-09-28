@@ -11,6 +11,7 @@ import 'noticia_form_screen.dart';
 import 'pago_form_screen.dart';
 import 'socio_form_screen.dart';
 import 'asistencia_form_screen.dart';
+import 'asistencia_reporte_screen.dart';
 import 'ingreso_form_screen.dart';
 import 'gasto_form_screen.dart';
 import 'buscar_socio_screen.dart';
@@ -240,6 +241,14 @@ _Seccion(
             icono: Icons.fact_check_outlined,
             visible: _puede(['admin', 'asistencias', 'profesor']),
             onTap: () => _abrir(AsistenciaFormScreen(token: token, clubId: clubId)),
+          ),
+          _AccionAdmin(
+            titulo: 'Reporte de asistencia',
+            icono: Icons.bar_chart_rounded,
+            // ✅ NUEVO: mismos roles que ya pueden tomar asistencia, para
+            // que también puedan consultar el historial/reporte desde la app.
+            visible: _puede(['admin', 'asistencias', 'profesor']),
+            onTap: () => _abrir(AsistenciaReporteScreen(token: token, clubId: clubId)),
           ),
           _AccionAdmin(
             titulo: 'Control de acceso',
