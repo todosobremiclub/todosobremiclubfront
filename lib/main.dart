@@ -113,6 +113,7 @@ Future<void> main() async {
 
     await PushService.syncTopicsForSocio(
       clubId: clubId,
+      socioId: socioObj.id,
       actividad: socioObj.actividad,
       categoria: socioObj.categoria,
       anioNacimiento:

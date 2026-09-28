@@ -181,6 +181,14 @@ static Future<void> subscribeToClub(String clubId) async {
 
   static String _topicFaltaPago(String clubId) => 'club_${clubId}_faltapago';
 
+  // ✅ NUEVO (Tienda Online, paso 6): topic personal del socio, usado para
+  // avisos 1 a 1 (ej: "tu reserva fue aceptada/rechazada"), que no
+  // corresponden a ninguno de los topics segmentados de arriba.
+  // ⚠️ Debe coincidir exactamente con topicSocio() en
+  // backend/src/services/notificacionesService.js.
+  static String _topicSocio(String clubId, String socioId) =>
+      'club_${clubId}_socio_$socioId';
+
   // ======================================================
   // Suscripción / desuscripción genérica (con manejo de
   // kIsWeb y errores, igual que subscribeToClub)
@@ -254,6 +262,15 @@ static Future<void> subscribeToClub(String clubId) async {
       _unsubscribe(_topicFaltaPago(clubId));
 
   // ======================================================
+  // ✅ NUEVO (Tienda Online, paso 6): topic personal por socio
+  // ======================================================
+  static Future<void> subscribeToSocio(String clubId, String socioId) =>
+      _subscribe(_topicSocio(clubId, socioId));
+
+  static Future<void> unsubscribeFromSocio(String clubId, String socioId) =>
+      _unsubscribe(_topicSocio(clubId, socioId));
+
+  // ======================================================
   // Sincroniza TODOS los topics segmentados del socio de una
   // sola vez. Se llama después del login, en el cold start
   // (main.dart) y cada vez que se re-sincroniza la sesión
@@ -264,6 +281,7 @@ static Future<void> subscribeToClub(String clubId) async {
   // ======================================================
   static Future<void> syncTopicsForSocio({
     required String clubId,
+    required String socioId,
     String? actividad,
     String? categoria,
     String? anioNacimiento,
@@ -271,6 +289,12 @@ static Future<void> subscribeToClub(String clubId) async {
   }) async {
     // club_$clubId (todos) siempre suscripto
     await subscribeToClub(clubId);
+
+    // ✅ NUEVO (Tienda Online, paso 6): topic personal, siempre suscripto
+    // si hay socioId (para recibir avisos de reservas de tienda, etc.)
+    if (socioId.trim().isNotEmpty) {
+      await subscribeToSocio(clubId, socioId);
+    }
 
     if (actividad != null && actividad.trim().isNotEmpty) {
       await subscribeToActividad(clubId, actividad);

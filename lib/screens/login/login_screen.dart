@@ -134,6 +134,7 @@ class _LoginScreenState extends State<LoginScreen> {
       final socioObj = session.socioObj;
       await PushService.syncTopicsForSocio(
         clubId: session.clubObj.id,
+        socioId: socioObj.id,
         actividad: socioObj.actividad,
         categoria: socioObj.categoria,
         anioNacimiento:
