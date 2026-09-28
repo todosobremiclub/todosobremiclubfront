@@ -9,6 +9,7 @@ import '../carnet/carnet_screen.dart';
 import '../noticias/noticias_screen.dart';
 import '../cumples/cumples_screen.dart';
 import '../recibos/recibos_screen.dart';
+import '../mas/mas_screen.dart'; // ✅ NUEVO: menú "Más" (aloja Tienda y futuras secciones)
 
 
 class HomeScreen extends StatefulWidget {
@@ -278,6 +279,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       ),
 
       RecibosScreen(session: widget.session),
+
+      // ✅ NUEVO: "Más" — aloja Tienda (si el club la tiene habilitada) y
+      // futuras secciones secundarias.
+      MasScreen(session: widget.session),
     ];
 
     return Scaffold(
@@ -371,6 +376,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           const BottomNavigationBarItem(
             icon: Icon(Icons.receipt_long),
             label: 'Recibos',
+          ),
+          // ✅ NUEVO
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.more_horiz),
+            label: 'Más',
           ),
         ],
       ),

@@ -19,6 +19,11 @@ class Club {
   // (window.currentClub?.whatsapp_habilitado === true).
   final bool whatsappHabilitado;
 
+  // ✅ NUEVO: indica si el club tiene activado el módulo de Tienda Online.
+  // Se usa para mostrar/ocultar el ítem "Tienda" dentro del menú "Más",
+  // igual que en el panel web (window.currentClub?.tienda_habilitada === true).
+  final bool tiendaHabilitada;
+
   Club({
     required this.id,
     required this.nombre,
@@ -29,6 +34,7 @@ class Club {
     this.instagramUrl,
     required this.transferenciaHabilitada,
     this.whatsappHabilitado = false,
+    this.tiendaHabilitada = false,
   });
 
   factory Club.fromJson(Map<String, dynamic> json) {
@@ -58,6 +64,10 @@ class Club {
       // ✅ NUEVO
       whatsappHabilitado:
           json['whatsapp_habilitado'] == true,
+
+      // ✅ NUEVO (Tienda Online)
+      tiendaHabilitada:
+          json['tienda_habilitada'] == true,
     );
   }
 
@@ -72,6 +82,7 @@ class Club {
       'instagram_url': instagramUrl,
       'transferencia_habilitada': transferenciaHabilitada,
       'whatsapp_habilitado': whatsappHabilitado,
+      'tienda_habilitada': tiendaHabilitada,
     };
   }
 }
