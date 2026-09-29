@@ -8,8 +8,10 @@
 import 'package:flutter/material.dart';
 import '../../core/services/storage_service.dart';
 import '../../services/tienda_service.dart';
+import '../../services/carrito_tienda.dart';
 import 'producto_detalle_screen.dart';
 import 'mis_reservas_screen.dart';
+import 'carrito_screen.dart';
 
 class TiendaScreen extends StatefulWidget {
   final AppSession session;
@@ -117,6 +119,50 @@ class _TiendaScreenState extends State<TiendaScreen> {
         foregroundColor: scheme.onPrimary,
         title: const Text('Tienda'),
         actions: [
+          // ✅ NUEVO: acceso al carrito con badge de cantidad de ítems.
+          ListenableBuilder(
+            listenable: CarritoTienda.instance,
+            builder: (context, _) {
+              final cantidad = CarritoTienda.instance.cantidadTotal;
+              return Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.shopping_cart_outlined),
+                    tooltip: 'Carrito',
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => CarritoScreen(session: widget.session),
+                        ),
+                      );
+                    },
+                  ),
+                  if (cantidad > 0)
+                    Positioned(
+                      right: 6,
+                      top: 6,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: Colors.redAccent,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          '$cantidad',
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.receipt_long),
             tooltip: 'Mis reservas',

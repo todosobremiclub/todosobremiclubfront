@@ -148,19 +148,39 @@ class _MisReservasScreenState extends State<MisReservasScreen> {
                 );
               }
 
+              // ✅ NUEVO: agrupa las líneas por pedido_id (un pedido con
+              // varios productos del carrito se muestra como una sola
+              // tarjeta con todas sus líneas, ya que el club lo gestiona
+              // como una unidad).
+              final pedidos = <String, List<Map<String, dynamic>>>{};
+              final ordenPedidos = <String>[];
+              for (final r in reservas) {
+                final pedidoId = (r['pedido_id'] ?? r['id'] ?? '').toString();
+                if (!pedidos.containsKey(pedidoId)) {
+                  pedidos[pedidoId] = [];
+                  ordenPedidos.add(pedidoId);
+                }
+                pedidos[pedidoId]!.add(r);
+              }
+
               return ListView.separated(
                 padding: const EdgeInsets.all(16),
-                itemCount: reservas.length,
+                itemCount: ordenPedidos.length,
                 separatorBuilder: (_, __) => const SizedBox(height: 12),
                 itemBuilder: (context, i) {
-                  final r = reservas[i];
-                  final estado = (r['estado'] ?? '').toString();
+                  final lineas = pedidos[ordenPedidos[i]]!;
+                  final primera = lineas.first;
+                  final estado = (primera['estado'] ?? '').toString();
                   final info = _estadoInfo(estado);
-                  final productoNombre = (r['producto_nombre'] ?? '').toString();
-                  final imagenUrl = (r['producto_imagen_url'] ?? '').toString();
-                  final cantidad = (r['cantidad'] ?? 1).toString();
-                  final mensajeAdmin = (r['mensaje_admin'] ?? '').toString();
-                  final fecha = _formatFecha(r['created_at']?.toString());
+                  final fecha = _formatFecha(primera['created_at']?.toString());
+                  final esVariasLineas = lineas.length > 1;
+                  final totalPedido = lineas.fold<num>(0, (acc, r) {
+                    final precio = num.tryParse((r['producto_precio'] ?? 0).toString()) ?? 0;
+                    final cant = num.tryParse((r['cantidad'] ?? 1).toString()) ?? 1;
+                    return acc + precio * cant;
+                  });
+
+                  final mensajeAdmin = (primera['mensaje_admin'] ?? '').toString();
 
                   return Container(
                     padding: const EdgeInsets.all(14),
@@ -176,100 +196,125 @@ class _MisReservasScreenState extends State<MisReservasScreen> {
                         ),
                       ],
                     ),
-                    child: Row(
+                    child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(10),
-                          child: Container(
-                            width: 60,
-                            height: 60,
-                            color: Colors.grey.shade100,
-                            child: imagenUrl.isNotEmpty
-                                ? Image.network(
-                                    imagenUrl,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => const Icon(
-                                      Icons.image_outlined,
-                                      color: Colors.black26,
-                                    ),
-                                  )
-                                : const Icon(Icons.shopping_bag_outlined, color: Colors.black26),
-                          ),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                esVariasLineas ? 'Pedido con ${lineas.length} productos' : 'Pedido',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                  color: Colors.black54,
+                                ),
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: info.color.withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Text(
+                                info.label,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: info.color,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      productoNombre,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 15,
-                                        color: Colors.black,
-                                      ),
-                                    ),
-                                  ),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                    decoration: BoxDecoration(
-                                      color: info.color.withOpacity(0.12),
-                                      borderRadius: BorderRadius.circular(999),
-                                    ),
-                                    child: Text(
-                                      info.label,
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w700,
-                                        color: info.color,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Cantidad: $cantidad · ${_formatPrecio(r['producto_precio'])}',
-                                style: const TextStyle(fontSize: 12, color: Colors.black54),
-                              ),
-                              if (fecha.isNotEmpty)
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 2),
-                                  child: Text(
-                                    'Reservado el $fecha',
-                                    style: const TextStyle(fontSize: 11, color: Colors.black38),
+                        const SizedBox(height: 10),
+                        for (final r in lineas)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: Container(
+                                    width: 52,
+                                    height: 52,
+                                    color: Colors.grey.shade100,
+                                    child: ((r['producto_imagen_url'] ?? '').toString()).isNotEmpty
+                                        ? Image.network(
+                                            (r['producto_imagen_url'] ?? '').toString(),
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (_, __, ___) => const Icon(
+                                              Icons.image_outlined,
+                                              color: Colors.black26,
+                                            ),
+                                          )
+                                        : const Icon(Icons.shopping_bag_outlined, color: Colors.black26),
                                   ),
                                 ),
-                              if (mensajeAdmin.isNotEmpty)
-                                Container(
-                                  margin: const EdgeInsets.only(top: 8),
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey.shade50,
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(color: Colors.black12),
-                                  ),
-                                  child: Row(
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      const Icon(Icons.chat_bubble_outline, size: 14, color: Colors.black45),
-                                      const SizedBox(width: 6),
-                                      Expanded(
-                                        child: Text(
-                                          mensajeAdmin,
-                                          style: const TextStyle(fontSize: 12, color: Colors.black87),
+                                      Text(
+                                        (r['talle'] ?? '').toString().isNotEmpty
+                                            ? '${r['producto_nombre'] ?? ''} (talle ${r['talle']})'
+                                            : (r['producto_nombre'] ?? '').toString(),
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14,
+                                          color: Colors.black,
                                         ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        'Cantidad: ${r['cantidad'] ?? 1} · ${_formatPrecio(r['producto_precio'])}',
+                                        style: const TextStyle(fontSize: 12, color: Colors.black54),
                                       ),
                                     ],
                                   ),
                                 ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
+                        if (esVariasLineas)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 6),
+                            child: Text(
+                              'Total: ${_formatPrecio(totalPedido)}',
+                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.black87),
+                            ),
+                          ),
+                        if (fecha.isNotEmpty)
+                          Text(
+                            'Reservado el $fecha',
+                            style: const TextStyle(fontSize: 11, color: Colors.black38),
+                          ),
+                        if (mensajeAdmin.isNotEmpty)
+                          Container(
+                            margin: const EdgeInsets.only(top: 8),
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade50,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.black12),
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Icon(Icons.chat_bubble_outline, size: 14, color: Colors.black45),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    mensajeAdmin,
+                                    style: const TextStyle(fontSize: 12, color: Colors.black87),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                       ],
                     ),
                   );
