@@ -164,7 +164,12 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
           _AccionAdmin(
             titulo: 'Registrar ingreso',
             icono: Icons.point_of_sale_outlined,
-            visible: _puede(['admin']),
+            // ✅ FIX: el rol "finanzas" no veía este botón (quedó con
+            // _puede(['admin']) por error), aunque el comentario de reglas
+            // de visibilidad de más arriba ya dice "finanzas -> pagos,
+            // ingresos, gastos", igual que Registrar pago de cuota y
+            // Registrar gasto, acá abajo.
+            visible: _puede(['admin', 'finanzas']),
             onTap: () => _abrir(IngresoFormScreen(token: token, clubId: clubId)),
           ),
           _AccionAdmin(
