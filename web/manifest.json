@@ -1,11 +1,11 @@
 {
-    "name": "todosobremiclub_app",
-    "short_name": "todosobremiclub_app",
+    "name": "Todo Sobre Mi Club",
+    "short_name": "TSMC",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#ffffff",
+    "theme_color": "#2563eb",
+    "description": "Carnet digital, noticias, recibos y pagos de tu club.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

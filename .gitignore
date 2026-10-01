@@ -48,4 +48,10 @@ app.*.map.json
 # Firebase
 android/app/google-services.json
 
-android/app/google-services.json 
+android/app/google-services.json
+
+# ✅ NUEVO: carpeta de cache/estado local del Firebase CLI (firebase init
+# hosting / firebase deploy) — no tiene nada que compartir con el repo, cada
+# PC la regenera sola.
+.firebase/
+
