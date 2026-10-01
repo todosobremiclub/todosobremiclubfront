@@ -393,9 +393,22 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final pages = [
       CarnetScreen(session: widget.session),
 
-      // 👇 ESTE FIX RESUELVE TU PROBLEMA
+      // ⚠️ IMPORTANTE: NO ponerle key: ValueKey(_noticiasBadgeCount) a
+      // NoticiasScreen. Ese key cambiaba cada vez que cambiaba la cantidad
+      // de noticias sin leer, y como ese cambio lo dispara la propia
+      // NoticiasScreen (vía onUnreadCountChanged, justo al terminar de
+      // cargar), Flutter terminaba destruyendo y recreando toda la pantalla
+      // en medio de su propio ciclo de build (dentro del IndexedStack, que
+      // normalmente no debería recrear sus hijos). Eso corrompía el árbol
+      // de widgets (errores "Duplicate GlobalKey", "_elements.contains
+      // (element) is not true", "Looking up a deactivated widget's
+      // ancestor is unsafe") — crash total en Flutter Web apenas se
+      // logueaba, porque todas las pestañas se arman de entrada acá abajo.
+      // Sin key explícito, Flutter reutiliza la misma instancia de
+      // NoticiasScreen entre rebuilds (coincide tipo + posición), que es
+      // lo que corresponde: el badge ya se actualiza solo con el setState
+      // de _actualizarBadgeNoticias, sin necesidad de recrear la pantalla.
       NoticiasScreen(
-        key: ValueKey(_noticiasBadgeCount),
         session: widget.session,
         onUnreadCountChanged: _actualizarBadgeNoticias,
       ),

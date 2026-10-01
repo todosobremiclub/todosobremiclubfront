@@ -4,7 +4,8 @@ import 'package:flutter/services.dart';
 import '../../services/auth_service.dart';
 import '../../core/services/storage_service.dart';
 import '../../core/services/push_service.dart'; // ✅ NUEVO: FCM topic subscribe
-import '../../app.dart'; // 👈 para volver a MyApp después del login
+import '../../core/config/app_theme.dart'; // 👈 tema dinámico del club (reemplaza el import de app.dart)
+import '../home/home_screen.dart'; // 👈 pantalla de socio (reemplaza el import de app.dart)
 import '../admin/admin_home_screen.dart'; // ✅ NUEVO: pantalla de administración
 
 class LoginScreen extends StatefulWidget {
@@ -144,10 +145,27 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (!mounted) return;
 
+      // ⚠️ IMPORTANTE: antes acá se navegaba a `const MyApp()` (el widget
+      // raíz de toda la app). Eso montaba un SEGUNDO `MaterialApp` con el
+      // mismo `navigatorKey: SessionService.navigatorKey` que ya tiene
+      // asignado el `MaterialApp` original (el de `main.dart`, que sigue
+      // vivo debajo de este Navigator mientras tanto) — un GlobalKey no
+      // puede estar en dos widgets del árbol a la vez. Eso disparaba
+      // "Duplicate GlobalKey detected in widget tree" y corrompía el árbol
+      // de widgets (visible como pantalla roja apenas logueaba en Flutter
+      // Web; en el celular, en modo release, estos asserts se eliminan del
+      // build así que no se veía el error, pero el problema de fondo
+      // existía igual). La solución es navegar directo a HomeScreen (igual
+      // que ya hace el login de administrador más abajo con
+      // AdminHomeScreen) y aplicarle el tema del club con un Theme(...)
+      // local, sin crear un MaterialApp/Navigator nuevo.
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (_) => const MyApp(),
+          builder: (_) => Theme(
+            data: AppTheme.fromClub(session.clubObj),
+            child: HomeScreen(session: session),
+          ),
         ),
       );
     } catch (e) {

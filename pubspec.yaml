@@ -2,7 +2,7 @@ name: todosobremiclub_app
 description: "A new Flutter project."
 publish_to: 'none'
 
-version: 3.0.24+51
+version: 3.0.27+54
 
 environment:
   sdk: ^3.11.1
@@ -69,6 +69,16 @@ flutter_launcher_icons:
 
   adaptive_icon_background: "#FFFFFF"
   adaptive_icon_foreground: "assets/icons/logo_app.png"
+
+  # ✅ NUEVO: versión web (favicon.png + web/icons/Icon-*.png). Antes solo
+  # generaba android/ios, así que la carpeta web/ se había quedado con el
+  # logo genérico de Flutter. Correr `dart run flutter_launcher_icons`
+  # después de este cambio para regenerarlos con el logo real de TSMC.
+  web:
+    generate: true
+    image_path: "assets/icons/logo_app.png"
+    background_color: "#ffffff"
+    theme_color: "#2563eb"
 
 flutter:
   uses-material-design: true
