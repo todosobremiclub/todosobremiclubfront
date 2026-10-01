@@ -3,6 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/services/storage_service.dart';
 import '../../core/services/notification_store.dart';
+import '../../services/socio_service.dart'; // ✅ NUEVO: "Cambiar de socio"
 
 import '../login/login_screen.dart';
 import '../carnet/carnet_screen.dart';
@@ -26,12 +27,138 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   int _noticiasBadgeCount = 0;
   int _cumplesBadgeCount = 0;
 
+  // ✅ NUEVO: "Cambiar de socio" (Grupo Familiar + relación manual). Se
+  // carga una sola vez al entrar; si viene vacía, el botón ni se muestra.
+  final SocioService _socioService = SocioService();
+  List<Map<String, dynamic>> _sociosRelacionados = [];
+  bool _cambiandoSocio = false;
+
 @override
   void initState() {
     super.initState();
 
     NotificationStore.instance.addListener(_onNotificationsChanged);
     WidgetsBinding.instance.addObserver(this); // ✅ NUEVO: auto-logout 8hs
+    _cargarSociosRelacionados();
+  }
+
+  Future<void> _cargarSociosRelacionados() async {
+    try {
+      final socios = await _socioService.getSociosRelacionados(
+        token: widget.session.token,
+      );
+      if (!mounted) return;
+      setState(() => _sociosRelacionados = socios);
+    } catch (e) {
+      // Silencioso: si falla, simplemente no se muestra el selector. No es
+      // una función crítica como para interrumpir al socio con un error.
+      debugPrint('No se pudieron cargar los socios relacionados: $e');
+    }
+  }
+
+  Future<void> _cambiarASocio(Map<String, dynamic> socio) async {
+    if (_cambiandoSocio) return;
+    setState(() => _cambiandoSocio = true);
+
+    try {
+      final data = await _socioService.cambiarSocio(
+        token: widget.session.token,
+        socioId: socio['id'].toString(),
+      );
+
+      await StorageService.saveSession(
+        token: data['token'],
+        socio: Map<String, dynamic>.from(data['socio']),
+        club: Map<String, dynamic>.from(data['club']),
+      );
+
+      if (!mounted) return;
+      Navigator.of(context).pop(); // cierra el bottom sheet
+
+      final nuevaSesion = AppSession(
+        token: data['token'],
+        socio: Map<String, dynamic>.from(data['socio']),
+        club: Map<String, dynamic>.from(data['club']),
+      );
+
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => HomeScreen(session: nuevaSesion)),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo cambiar de socio: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _cambiandoSocio = false);
+    }
+  }
+
+  void _abrirSelectorSocios() {
+    final scheme = Theme.of(context).colorScheme;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      showDragHandle: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.switch_account, color: scheme.primary),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Cambiar de socio',
+                        style: TextStyle(
+                          color: scheme.primary,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                ..._sociosRelacionados.map(
+                  (s) => ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: CircleAvatar(
+                      backgroundColor: scheme.primary.withOpacity(0.1),
+                      backgroundImage: (s['foto_url'] ?? '').toString().isNotEmpty
+                          ? NetworkImage(s['foto_url'].toString())
+                          : null,
+                      child: (s['foto_url'] ?? '').toString().isEmpty
+                          ? Icon(Icons.person, color: scheme.primary)
+                          : null,
+                    ),
+                    title: Text('${s['apellido'] ?? ''} ${s['nombre'] ?? ''}'.trim()),
+                    subtitle: Text('N° ${s['numero'] ?? ''}'),
+                    trailing: _cambiandoSocio
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.chevron_right),
+                    onTap: _cambiandoSocio ? null : () => _cambiarASocio(s),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   // ✅ NUEVO: chequea expiración de sesión cada vez que la app vuelve
@@ -335,6 +462,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               ),
             ),
           ),
+          // ✅ NUEVO: "Cambiar de socio" — solo se muestra si el socio
+          // logueado tiene Grupo Familiar o relación manual configurada.
+          if (_sociosRelacionados.isNotEmpty)
+            IconButton(
+              onPressed: _abrirSelectorSocios,
+              tooltip: 'Cambiar de socio',
+              icon: Icon(Icons.switch_account, color: scheme.onPrimary),
+            ),
           IconButton(
             onPressed: _logout,
             icon: Icon(Icons.logout, color: scheme.onPrimary),
