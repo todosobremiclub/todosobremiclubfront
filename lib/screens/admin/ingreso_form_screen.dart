@@ -136,7 +136,24 @@ Future<void> _guardar() async {
                         child: Text(t['nombre'].toString()),
                       ))
                   .toList(),
-              onChanged: (v) => setState(() => _tipoId = v),
+              // ✅ NUEVO: si el tipo elegido tiene un monto habitual configurado
+              // (Configuración > Tipos de ingreso, en el panel web), se completa
+              // el campo Monto solo; se puede editar antes de guardar. Si el
+              // tipo no tiene monto cargado, se limpia el campo en vez de
+              // dejar el monto del tipo elegido anteriormente.
+              onChanged: (v) => setState(() {
+                _tipoId = v;
+                final tipo = _tipos.firstWhere(
+                  (t) => t['id'].toString() == v,
+                  orElse: () => const {},
+                );
+                final monto = tipo['monto'];
+                if (monto != null) {
+                  _montoController.text = monto.toString();
+                } else {
+                  _montoController.clear();
+                }
+              }),
             ),
             const SizedBox(height: 12),
 DropdownButtonFormField<String>(
