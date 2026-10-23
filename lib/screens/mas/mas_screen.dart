@@ -1,11 +1,15 @@
 // lib/screens/mas/mas_screen.dart
 //
-// ✅ NUEVO: pantalla del ítem "Más" del bottom nav — pensada para alojar
-// secciones secundarias a futuro (por ahora solo "Tienda", condicionada a
-// que el club la tenga habilitada). Si el club no tiene ninguna sección
+// ✅ NUEVO: pantalla del ítem "Más" del bottom nav — aloja las secciones
+// secundarias: "Tienda" (si el club la tiene habilitada) y, con el módulo
+// Espacios y Clases habilitado, "Reservar un espacio", "Mis reservas y abonos"
+// y "Clases". Si el club no tiene ninguna sección
 // habilitada todavía, muestra un estado vacío en vez de una lista vacía.
 import 'package:flutter/material.dart';
 import '../../core/services/storage_service.dart';
+import '../espacios/clases_screen.dart';
+import '../espacios/espacios_screen.dart';
+import '../espacios/mis_reservas_espacios_screen.dart';
 import '../tienda/tienda_screen.dart';
 
 class MasScreen extends StatelessWidget {
@@ -33,6 +37,47 @@ class MasScreen extends StatelessWidget {
             );
           },
         ),
+      if (club.espaciosHabilitado) ...[
+        _MasItem(
+          icon: Icons.sports_soccer,
+          titulo: 'Reservar un espacio',
+          subtitulo: 'Canchas y salones del club',
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => EspaciosScreen(session: session),
+              ),
+            );
+          },
+        ),
+        _MasItem(
+          icon: Icons.event_note,
+          titulo: 'Mis reservas y abonos',
+          subtitulo: 'Estado de tus turnos y abonos fijos',
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => MisReservasEspaciosScreen(session: session),
+              ),
+            );
+          },
+        ),
+        _MasItem(
+          icon: Icons.school,
+          titulo: 'Clases',
+          subtitulo: 'Tus clases y las que ofrece el club',
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ClasesScreen(session: session),
+              ),
+            );
+          },
+        ),
+      ],
     ];
 
     return Scaffold(

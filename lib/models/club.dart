@@ -24,6 +24,11 @@ class Club {
   // igual que en el panel web (window.currentClub?.tienda_habilitada === true).
   final bool tiendaHabilitada;
 
+  // ✅ NUEVO: indica si el club tiene activado el módulo "Espacios y Clases"
+  // (reservas de canchas/salones, abonos y clases). Se usa para mostrar/ocultar
+  // esos ítems en el menú "Más" (backend: clubs.espacios_habilitado).
+  final bool espaciosHabilitado;
+
   Club({
     required this.id,
     required this.nombre,
@@ -35,6 +40,7 @@ class Club {
     required this.transferenciaHabilitada,
     this.whatsappHabilitado = false,
     this.tiendaHabilitada = false,
+    this.espaciosHabilitado = false,
   });
 
   factory Club.fromJson(Map<String, dynamic> json) {
@@ -68,6 +74,10 @@ class Club {
       // ✅ NUEVO (Tienda Online)
       tiendaHabilitada:
           json['tienda_habilitada'] == true,
+
+      // ✅ NUEVO (Espacios y Clases)
+      espaciosHabilitado:
+          json['espacios_habilitado'] == true,
     );
   }
 
@@ -83,6 +93,7 @@ class Club {
       'transferencia_habilitada': transferenciaHabilitada,
       'whatsapp_habilitado': whatsappHabilitado,
       'tienda_habilitada': tiendaHabilitada,
+      'espacios_habilitado': espaciosHabilitado,
     };
   }
 }
