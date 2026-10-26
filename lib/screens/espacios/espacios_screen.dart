@@ -37,18 +37,8 @@ class _EspaciosScreenState extends State<EspaciosScreen> {
     } catch (_) {}
   }
 
-  IconData _icono(String? tipo) {
-    switch (tipo) {
-      case 'cancha':
-        return Icons.sports_soccer;
-      case 'salon':
-        return Icons.meeting_room;
-      case 'espacio':
-        return Icons.stadium;
-      default:
-        return Icons.place;
-    }
-  }
+  // Ícono genérico (sirve para cancha de fútbol, pádel, salón, etc.) cuando el recurso no tiene foto.
+  IconData _icono(String? tipo) => Icons.stadium;
 
   String _fmtDuracion(dynamic min) {
     final m = int.tryParse((min ?? '').toString());
@@ -68,7 +58,7 @@ class _EspaciosScreenState extends State<EspaciosScreen> {
       appBar: AppBar(
         backgroundColor: scheme.primary,
         foregroundColor: scheme.onPrimary,
-        title: const Text('Reservar un espacio'),
+        title: const Text('Reservar un recurso'),
         actions: [
           IconButton(
             tooltip: 'Mis reservas y abonos',
@@ -106,7 +96,7 @@ class _EspaciosScreenState extends State<EspaciosScreen> {
                     SizedBox(height: 80),
                     EstadoVacio(
                       icon: Icons.stadium_outlined,
-                      texto: 'Por ahora el club no tiene espacios disponibles para reservar desde la app.',
+                      texto: 'Por ahora el club no tiene recursos disponibles para reservar desde la app.',
                     ),
                   ],
                 );

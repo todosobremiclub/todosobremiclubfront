@@ -1,12 +1,12 @@
 // lib/services/espacios_service.dart
 //
-// Service de "Espacios y Clases", lado socio (app). Habla contra los
+// Service de "Espacios", lado socio (app). Habla contra los
 // endpoints de backend/src/routes/espaciosAppRoutes.js (montado en /app).
 // El club y el socio salen del token, igual que en la Tienda.
 //
 // Reservas: recursos, turnos libres, crear / mías / cancelar.
 // Abonos: los del socio (solo lectura; los gestiona el club).
-// Clases: todas las del club y las del socio (las inscripciones las hace el club).
+// (Las clases / entrenamientos están en clases_service.dart.)
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../core/config/api_config.dart';
@@ -124,22 +124,5 @@ class EspaciosService {
   Future<List<Map<String, dynamic>>> getMisAbonos({required String token}) async {
     final data = await _get('/app/espacios/abonos/mios', token, 'No se pudieron cargar tus abonos');
     return _lista(data['abonos']);
-  }
-
-  // ------------------------------------------------------------------
-  // Clases
-  // ------------------------------------------------------------------
-
-  /// Todas las clases activas del club (con cupo e indicador "inscripto").
-  Future<List<Map<String, dynamic>>> getClases({required String token}) async {
-    final data = await _get('/app/clases', token, 'No se pudieron cargar las clases');
-    return _lista(data['clases']);
-  }
-
-  /// Clases donde el socio está inscripto, con sus próximas fechas
-  /// (las canceladas vienen con cancelada: true).
-  Future<List<Map<String, dynamic>>> getMisClases({required String token}) async {
-    final data = await _get('/app/clases/mias', token, 'No se pudieron cargar tus clases');
-    return _lista(data['clases']);
   }
 }

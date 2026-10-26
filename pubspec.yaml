@@ -51,6 +51,9 @@ dependencies:
   # ✅ Saber la versión/build instalada (para forzar actualización)
   package_info_plus: ^8.0.0
 
+  # ✅ Huella / Face ID para desbloquear la app (BiometricService)
+  local_auth: ^2.3.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

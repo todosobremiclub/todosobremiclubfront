@@ -87,7 +87,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (usuario.isEmpty || contrasena.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Completá usuario y contraseña')),
+        const SnackBar(content: Text('Completá número de socio y DNI')),
       );
       return;
     }
@@ -293,10 +293,10 @@ class _LoginScreenState extends State<LoginScreen> {
                       : [FilteringTextInputFormatter.digitsOnly],
                   style: const TextStyle(color: textMain),
                   decoration: InputDecoration(
-                    labelText: _isAdminMode ? 'Email' : 'Usuario',
+                    labelText: _isAdminMode ? 'Email' : 'Número de Socio',
                     labelStyle: const TextStyle(color: textMuted),
                     prefixIcon: Icon(
-                      _isAdminMode ? Icons.email : Icons.person,
+                      _isAdminMode ? Icons.email : Icons.badge,
                       color: textMuted,
                     ),
                     enabledBorder: OutlineInputBorder(
@@ -325,9 +325,12 @@ class _LoginScreenState extends State<LoginScreen> {
                   obscureText: true,
                   style: const TextStyle(color: textMain),
                   decoration: InputDecoration(
-                    labelText: 'Contraseña',
+                    labelText: _isAdminMode ? 'Contraseña' : 'DNI',
                     labelStyle: const TextStyle(color: textMuted),
-                    prefixIcon: const Icon(Icons.lock, color: textMuted),
+                    prefixIcon: Icon(
+                      _isAdminMode ? Icons.lock : Icons.credit_card,
+                      color: textMuted,
+                    ),
                     enabledBorder: OutlineInputBorder(
                       borderSide: const BorderSide(color: borderEnabled),
                       borderRadius: BorderRadius.circular(12),

@@ -155,6 +155,10 @@ class _ReservasTabState extends State<_ReservasTab> with AutomaticKeepAliveClien
     final com = (r['comentario'] ?? '').toString().trim();
     final puedeCancelar = r['puede_cancelar'] == true;
     final activa = r['estado'] == 'pendiente' || r['estado'] == 'aceptada';
+    // Si el socio figura como participante (no es el titular), no puede cancelar.
+    final esParticipante = r['rol'] == 'participante';
+    final titular = (r['titular'] ?? '').toString().trim();
+    final participantes = List<String>.from(((r['participantes'] ?? []) as List).map((x) => x.toString()));
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -190,6 +194,15 @@ class _ReservasTabState extends State<_ReservasTab> with AutomaticKeepAliveClien
             '${fechaLarga(r['fecha']?.toString())} · ${r['hora_desde']} a ${r['hora_hasta']}',
             style: const TextStyle(color: Colors.black87),
           ),
+          if (esParticipante && titular.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text('Reserva de $titular (vas como participante)',
+                style: const TextStyle(fontSize: 13, color: Colors.black87)),
+          ] else if (participantes.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text('Van con vos: ${participantes.join(', ')}',
+                style: const TextStyle(fontSize: 13, color: Colors.black87)),
+          ],
           if (com.isNotEmpty) ...[
             const SizedBox(height: 6),
             Text('Tu comentario: $com', style: const TextStyle(fontSize: 12, color: Colors.black54)),
@@ -198,7 +211,7 @@ class _ReservasTabState extends State<_ReservasTab> with AutomaticKeepAliveClien
             const SizedBox(height: 6),
             Text('Mensaje del club: $msg', style: const TextStyle(fontSize: 13, color: Colors.black87)),
           ],
-          if (activa) ...[
+          if (activa && !esParticipante) ...[
             const SizedBox(height: 10),
             if (puedeCancelar)
               OutlinedButton.icon(
@@ -304,6 +317,9 @@ class _AbonosTabState extends State<_AbonosTab> with AutomaticKeepAliveClientMix
               final a = lista[i];
               final liberadas = List<Map<String, dynamic>>.from((a['fechas_liberadas'] ?? []) as List);
               final dia = int.tryParse((a['dia_semana'] ?? '').toString()) ?? 0;
+              final esParticipante = a['rol'] == 'participante';
+              final titular = (a['titular'] ?? '').toString().trim();
+              final participantes = List<String>.from(((a['participantes'] ?? []) as List).map((x) => x.toString()));
               return Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -331,6 +347,15 @@ class _AbonosTabState extends State<_AbonosTab> with AutomaticKeepAliveClientMix
                       'Todos los ${diaLargo(dia).toLowerCase()} · ${a['hora_desde']} a ${a['hora_hasta']}',
                       style: const TextStyle(color: Colors.black87),
                     ),
+                    if (esParticipante && titular.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text('Abono de $titular (vas como participante)',
+                          style: const TextStyle(fontSize: 13, color: Colors.black87)),
+                    ] else if (participantes.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text('Van con vos: ${participantes.join(', ')}',
+                          style: const TextStyle(fontSize: 13, color: Colors.black87)),
+                    ],
                     const SizedBox(height: 4),
                     Text(
                       a['proxima_fecha'] != null

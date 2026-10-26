@@ -1,21 +1,50 @@
 // lib/screens/mas/mas_screen.dart
 //
-// ✅ NUEVO: pantalla del ítem "Más" del bottom nav — aloja las secciones
-// secundarias: "Tienda" (si el club la tiene habilitada) y, con el módulo
-// Espacios y Clases habilitado, "Reservar un espacio", "Mis reservas y abonos"
-// y "Clases". Si el club no tiene ninguna sección
-// habilitada todavía, muestra un estado vacío en vez de una lista vacía.
+// Pantalla del ítem "Más" del bottom nav — aloja las secciones secundarias:
+//  - "Tienda" (si el club la tiene habilitada).
+//  - "Reservar un recurso" y "Mis reservas y abonos" (si el club tiene el
+//    módulo Recursos habilitado).
+//  - "Mis clases / entrenamientos" (solo si el socio tiene al menos una clase
+//    asignada desde la Agenda).
+// Si no hay ninguna sección disponible, muestra un estado vacío.
 import 'package:flutter/material.dart';
 import '../../core/services/storage_service.dart';
-import '../espacios/clases_screen.dart';
+import '../../services/clases_service.dart';
+import '../clases/mis_clases_screen.dart';
 import '../espacios/espacios_screen.dart';
 import '../espacios/mis_reservas_espacios_screen.dart';
 import '../tienda/tienda_screen.dart';
 
-class MasScreen extends StatelessWidget {
+class MasScreen extends StatefulWidget {
   final AppSession session;
 
   const MasScreen({super.key, required this.session});
+
+  @override
+  State<MasScreen> createState() => _MasScreenState();
+}
+
+class _MasScreenState extends State<MasScreen> {
+  AppSession get session => widget.session;
+
+  // Se activa cuando el socio tiene al menos una clase asignada; si falla la consulta, el ítem no aparece.
+  bool _tieneClases = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _cargarClases();
+  }
+
+  Future<void> _cargarClases() async {
+    try {
+      final clases = await ClasesService().getMisClases(token: session.token);
+      if (!mounted) return;
+      setState(() => _tieneClases = clases.isNotEmpty);
+    } catch (_) {
+      // Sin conexión o backend sin actualizar: no mostramos el ítem.
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -39,9 +68,9 @@ class MasScreen extends StatelessWidget {
         ),
       if (club.espaciosHabilitado) ...[
         _MasItem(
-          icon: Icons.sports_soccer,
-          titulo: 'Reservar un espacio',
-          subtitulo: 'Canchas y salones del club',
+          icon: Icons.stadium,
+          titulo: 'Reservar un recurso',
+          subtitulo: 'Canchas, salones y espacios del club',
           onTap: () {
             Navigator.push(
               context,
@@ -54,7 +83,7 @@ class MasScreen extends StatelessWidget {
         _MasItem(
           icon: Icons.event_note,
           titulo: 'Mis reservas y abonos',
-          subtitulo: 'Estado de tus turnos y abonos fijos',
+          subtitulo: 'Tus turnos y abonos fijos, propios o compartidos',
           onTap: () {
             Navigator.push(
               context,
@@ -64,20 +93,21 @@ class MasScreen extends StatelessWidget {
             );
           },
         ),
+      ],
+      if (_tieneClases)
         _MasItem(
           icon: Icons.school,
-          titulo: 'Clases',
-          subtitulo: 'Tus clases y las que ofrece el club',
+          titulo: 'Mis clases / entrenamientos',
+          subtitulo: 'Tus días y horarios',
           onTap: () {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => ClasesScreen(session: session),
+                builder: (_) => MisClasesScreen(session: session),
               ),
             );
           },
         ),
-      ],
     ];
 
     return Scaffold(

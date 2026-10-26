@@ -3,6 +3,7 @@
 
     <!-- ✅ Permiso de Internet -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
 
     <!-- ✅ Permisos de visibilidad de paquetes (Android 11+) -->
     <queries>
