@@ -58,6 +58,9 @@ class _AsistenciaFormScreenState extends State<AsistenciaFormScreen> {
   // ✅ NUEVO: texto del buscador de convocados (filtra sin refetch)
   String _filtroConvocados = '';
 
+  // ✅ NUEVO: filtro por estado de la lista de convocados: 'todos' | 'presentes' | 'ausentes'
+  String _filtroEstado = 'todos';
+
   List<Map<String, dynamic>> _invitados = [];
   List<Map<String, dynamic>> _resultadosInvitado = [];
   bool _buscandoInvitado = false;
@@ -225,6 +228,7 @@ class _AsistenciaFormScreenState extends State<AsistenciaFormScreen> {
         _invitados = [];
         _resultadosInvitado = [];
         _filtroConvocados = '';
+        _filtroEstado = 'todos';
         _buscarConvocadoController.clear();
         _pasoDatos = false;
       });
@@ -321,14 +325,134 @@ class _AsistenciaFormScreenState extends State<AsistenciaFormScreen> {
   // apellido o N° de socio). No toca `_convocados` ni `_presentes`.
   List<Map<String, dynamic>> get _convocadosVisibles {
     final q = _filtroConvocados.trim().toLowerCase();
-    if (q.isEmpty) return _convocados;
     return _convocados.where((s) {
+      if (_filtroEstado != 'todos') {
+        final presente = _presentes[s['id'].toString()] ?? false;
+        if (_filtroEstado == 'presentes' && !presente) return false;
+        if (_filtroEstado == 'ausentes' && presente) return false;
+      }
+      if (q.isEmpty) return true;
       final texto = '${s['apellido'] ?? ''} ${s['nombre'] ?? ''} ${s['numero_socio'] ?? ''}'.toLowerCase();
       return texto.contains(q);
     }).toList();
   }
 
   int get _totalPresentes => _presentes.values.where((v) => v).length;
+
+  // ✅ NUEVO: chip de filtro Todos / Presentes / Ausentes
+  Widget _chipEstado(String valor, String texto) {
+    final primary = Theme.of(context).colorScheme.primary;
+    final sel = _filtroEstado == valor;
+    return ChoiceChip(
+      label: Text(
+        texto,
+        style: TextStyle(
+          fontSize: 12.5,
+          fontWeight: FontWeight.w700,
+          color: sel ? Colors.white : primary,
+        ),
+      ),
+      selected: sel,
+      showCheckmark: false,
+      selectedColor: primary,
+      backgroundColor: primary.withOpacity(0.08),
+      onSelected: (_) => setState(() => _filtroEstado = valor),
+    );
+  }
+
+  // ✅ NUEVO: avatar con iniciales (socio sin foto o foto que no carga)
+  Widget _avatarIniciales(String iniciales, Color primary) {
+    return Container(
+      color: primary.withOpacity(0.12),
+      alignment: Alignment.center,
+      child: Text(
+        iniciales,
+        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: primary),
+      ),
+    );
+  }
+
+  // ✅ NUEVO: fila de convocado con foto + interruptor Presente/Ausente.
+  // Tocar la fila o el interruptor marca/desmarca. La foto se pide en
+  // miniatura (cacheWidth) para no gastar memoria con listas largas.
+  Widget _filaSocio(Map<String, dynamic> s, Color primary) {
+    const verde = Color(0xFF10B981);
+    final id = s['id'].toString();
+    final presente = _presentes[id] ?? false;
+    final categoria = s['categoria']?.toString();
+    final foto = (s['foto_url'] ?? '').toString().trim();
+    final iniciales = _iniciales(s['nombre']?.toString(), s['apellido']?.toString());
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: presente ? verde.withOpacity(0.10) : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: presente ? verde.withOpacity(0.55) : Colors.black.withOpacity(0.06),
+        ),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () => setState(() => _presentes[id] = !presente),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(2),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: presente ? verde : Colors.black12, width: 2),
+                ),
+                child: ClipOval(
+                  child: SizedBox(
+                    width: 48,
+                    height: 48,
+                    child: foto.isEmpty
+                        ? _avatarIniciales(iniciales, primary)
+                        : Image.network(
+                            foto,
+                            fit: BoxFit.cover,
+                            cacheWidth: 144,
+                            errorBuilder: (_, __, ___) => _avatarIniciales(iniciales, primary),
+                            loadingBuilder: (ctx, child, progress) =>
+                                progress == null ? child : _avatarIniciales(iniciales, primary),
+                          ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${s['apellido']}, ${s['nombre']}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'N° ${s['numero_socio'] ?? '-'}${categoria != null && categoria.isNotEmpty ? ' · $categoria' : ''}',
+                      style: const TextStyle(fontSize: 11.5, color: Colors.black54),
+                    ),
+                  ],
+                ),
+              ),
+              Switch(
+                value: presente,
+                activeColor: Colors.white,
+                activeTrackColor: verde,
+                onChanged: (v) => setState(() => _presentes[id] = v),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
   String _iniciales(String? nombre, String? apellido) {
     final a = (apellido ?? '').trim();
@@ -795,31 +919,44 @@ class _AsistenciaFormScreenState extends State<AsistenciaFormScreen> {
                   onChanged: (v) => setState(() => _filtroConvocados = v),
                 ),
                 const SizedBox(height: 10),
+                // ✅ NUEVO: progreso de presentes
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(99),
+                  child: LinearProgressIndicator(
+                    minHeight: 7,
+                    value: _convocados.isEmpty ? 0 : _totalPresentes / _convocados.length,
+                    backgroundColor: primary.withOpacity(0.12),
+                    valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF10B981)),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                // ✅ NUEVO: filtros Todos / Presentes / Ausentes (con contador)
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _chipEstado('todos', 'Todos ${_convocados.length}'),
+                      const SizedBox(width: 8),
+                      _chipEstado('presentes', 'Presentes $_totalPresentes'),
+                      const SizedBox(width: 8),
+                      _chipEstado('ausentes', 'Ausentes ${_convocados.length - _totalPresentes}'),
+                    ],
+                  ),
+                ),
                 Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: primary.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        '$_totalPresentes de ${_convocados.length} presentes',
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: primary),
-                      ),
-                    ),
-                    const Spacer(),
                     TextButton(
                       onPressed: () => setState(() {
-                        for (final s in _convocados) {
+                        for (final s in _convocadosVisibles) {
                           _presentes[s['id'].toString()] = true;
                         }
                       }),
-                      child: const Text('Marcar todos', style: TextStyle(fontSize: 12.5)),
+                      child: const Text('Todos presentes', style: TextStyle(fontSize: 12.5)),
                     ),
                     TextButton(
                       onPressed: () => setState(() {
-                        for (final s in _convocados) {
+                        for (final s in _convocadosVisibles) {
                           _presentes[s['id'].toString()] = false;
                         }
                       }),
@@ -840,38 +977,7 @@ class _AsistenciaFormScreenState extends State<AsistenciaFormScreen> {
                   child: Text('Ningún convocado coincide con esa búsqueda.'),
                 )
               else
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: Colors.black.withOpacity(0.06)),
-                  ),
-                  child: Column(
-                    children: visibles.map((s) {
-                      final id = s['id'].toString();
-                      final categoria = s['categoria']?.toString();
-                      final presente = _presentes[id] ?? false;
-                      return CheckboxListTile(
-                        value: presente,
-                        onChanged: (v) => setState(() => _presentes[id] = v ?? false),
-                        secondary: CircleAvatar(
-                          radius: 16,
-                          backgroundColor: primary.withOpacity(0.12),
-                          child: Text(
-                            _iniciales(s['nombre']?.toString(), s['apellido']?.toString()),
-                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: primary),
-                          ),
-                        ),
-                        title: Text('${s['apellido']}, ${s['nombre']}', style: const TextStyle(fontSize: 13.5)),
-                        subtitle: Text(
-                          'N° ${s['numero_socio'] ?? '-'}${categoria != null && categoria.isNotEmpty ? ' · $categoria' : ''}',
-                          style: const TextStyle(fontSize: 11.5),
-                        ),
-                        controlAffinity: ListTileControlAffinity.trailing,
-                      );
-                    }).toList(),
-                  ),
-                ),
+                ...visibles.map((s) => _filaSocio(s, primary)),
               const SizedBox(height: 22),
               Text(
                 'Invitados de otra categoría (${_invitados.length})',
@@ -947,7 +1053,7 @@ class _AsistenciaFormScreenState extends State<AsistenciaFormScreen> {
                       height: 20,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Text('Guardar asistencia'),
+                  : Text('Guardar asistencia ($_totalPresentes/${_convocados.length})'),
             ),
           ),
         ),
