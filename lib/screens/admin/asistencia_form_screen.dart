@@ -22,7 +22,7 @@ class _AsistenciaFormScreenState extends State<AsistenciaFormScreen> {
   final _anioAdicionalController = TextEditingController(); // ✅ NUEVO
   final _buscarConvocadoController = TextEditingController(); // ✅ NUEVO: filtro de convocados
 
-  String _tipo = 'entrenamiento';
+  String? _tipo; // sin selección inicial: se elige Entrenamiento o Partido
   String? _actividad;
   String? _categoria;
   String? _actividadAdicional;
@@ -195,6 +195,12 @@ class _AsistenciaFormScreenState extends State<AsistenciaFormScreen> {
   }
 
   Future<void> _buscarConvocados() async {
+    if (_tipo == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Elegí el Tipo: Entrenamiento o Partido')),
+      );
+      return;
+    }
     if (_actividad == null || _categoria == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Elegí Actividad y Categoría')),
@@ -483,7 +489,7 @@ class _AsistenciaFormScreenState extends State<AsistenciaFormScreen> {
       await AdminApiService.guardarAsistencia(
         token: widget.token,
         clubId: widget.clubId,
-        tipo: _tipo,
+        tipo: _tipo ?? 'entrenamiento',
         actividad: _actividad!,
         categoria: _categoria!,
         fecha: fechaStr,
@@ -650,6 +656,43 @@ class _AsistenciaFormScreenState extends State<AsistenciaFormScreen> {
     );
   }
 
+  // Opción de Tipo (check exclusivo). Arrancan las dos sin tildar.
+  Widget _opcionTipo(String valor, String texto) {
+    final primary = Theme.of(context).colorScheme.primary;
+    final sel = _tipo == valor;
+    return InkWell(
+      borderRadius: BorderRadius.circular(10),
+      onTap: () => setState(() => _tipo = valor),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+        decoration: BoxDecoration(
+          color: sel ? primary.withOpacity(0.10) : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: sel ? primary : Colors.black.withOpacity(0.18),
+            width: sel ? 1.6 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              sel ? Icons.check_box : Icons.check_box_outline_blank,
+              size: 22,
+              color: sel ? primary : Colors.black45,
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                texto,
+                style: TextStyle(fontSize: 13, fontWeight: sel ? FontWeight.w700 : FontWeight.w500),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildPasoDatosLista() {
     return ListView(
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 16),
@@ -659,14 +702,12 @@ class _AsistenciaFormScreenState extends State<AsistenciaFormScreen> {
           icono: Icons.event_note_outlined,
           child: Column(
             children: [
-              DropdownButtonFormField<String>(
-                value: _tipo,
-                decoration: const InputDecoration(labelText: 'Tipo', border: OutlineInputBorder(), isDense: true),
-                items: const [
-                  DropdownMenuItem(value: 'entrenamiento', child: Text('🏋️ Entrenamiento')),
-                  DropdownMenuItem(value: 'partido', child: Text('🏆 Partido')),
+              Row(
+                children: [
+                  Expanded(child: _opcionTipo('entrenamiento', '🏋️ Entrenamiento')),
+                  const SizedBox(width: 10),
+                  Expanded(child: _opcionTipo('partido', '🏆 Partido')),
                 ],
-                onChanged: (v) => setState(() => _tipo = v ?? _tipo),
               ),
               const SizedBox(height: 10),
               ListTile(
