@@ -589,6 +589,7 @@ class AdminApiService {
     required double monto,
     String? observacion,
     String? cuentaId,
+    String? socioId, // ✅ NUEVO: socio asociado al ingreso (opcional)
   }) async {
     await post(
       token: token,
@@ -599,6 +600,7 @@ class AdminApiService {
         'monto': monto,
         if (observacion != null && observacion.isNotEmpty) 'observacion': observacion,
         if (cuentaId != null && cuentaId.isNotEmpty) 'cuenta_id': cuentaId,
+        if (socioId != null && socioId.isNotEmpty) 'socio_id': socioId,
       },
     );
   }

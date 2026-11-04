@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../services/admin_api_service.dart';
@@ -21,6 +23,7 @@ class _IngresoFormScreenState extends State<IngresoFormScreen> {
   String? _tipoId;
   String? _responsableId;
   DateTime _fecha = DateTime.now();
+  Map<String, dynamic>? _socio; // ✅ NUEVO: socio asociado (opcional)
 
   bool _cargando = true;
   bool _guardando = false;
@@ -54,6 +57,21 @@ class _IngresoFormScreenState extends State<IngresoFormScreen> {
         SnackBar(content: Text('Error cargando listas: $e')),
       );
     }
+  }
+
+  // ✅ NUEVO: nombre legible de un socio ("Apellido Nombre (#N°)")
+  String _nombreSocio(Map<String, dynamic> s) {
+    final nombre = '${s['apellido'] ?? ''} ${s['nombre'] ?? ''}'.trim();
+    final nro = s['numero_socio'];
+    return nro != null ? '$nombre (#$nro)' : nombre;
+  }
+
+  Future<void> _elegirSocio() async {
+    final elegido = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (_) => _SelectorSocioDialog(token: widget.token, clubId: widget.clubId),
+    );
+    if (elegido != null && mounted) setState(() => _socio = elegido);
   }
 
   Future<void> _elegirFecha() async {
@@ -90,6 +108,7 @@ Future<void> _guardar() async {
         monto: monto,
         observacion: _observacionController.text,
         cuentaId: _responsableId,
+        socioId: _socio?['id']?.toString(),
       );
 
       if (!mounted) return;
@@ -184,6 +203,43 @@ DropdownButtonFormField<String>(
               decoration: const InputDecoration(labelText: 'Monto', border: OutlineInputBorder()),
             ),
             const SizedBox(height: 12),
+            // ✅ NUEVO: socio opcional. Permite ver el ingreso después en
+            // Reportes > Ingresos por socio.
+            InputDecorator(
+              decoration: const InputDecoration(
+                labelText: 'Socio (opcional)',
+                border: OutlineInputBorder(),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: InkWell(
+                      onTap: _elegirSocio,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 6),
+                        child: Text(
+                          _socio == null ? 'Sin socio asignado' : _nombreSocio(_socio!),
+                          style: TextStyle(color: _socio == null ? Colors.black45 : null),
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (_socio != null)
+                    IconButton(
+                      tooltip: 'Quitar socio',
+                      icon: const Icon(Icons.close),
+                      onPressed: () => setState(() => _socio = null),
+                    )
+                  else
+                    IconButton(
+                      tooltip: 'Elegir socio',
+                      icon: const Icon(Icons.person_search),
+                      onPressed: _elegirSocio,
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
             TextField(
               controller: _observacionController,
               decoration: const InputDecoration(labelText: 'Observación (opcional)', border: OutlineInputBorder()),
@@ -198,6 +254,124 @@ DropdownButtonFormField<String>(
           ],
         ),
       ),
+    );
+  }
+}
+
+
+// ✅ NUEVO: diálogo para buscar y elegir un socio (nombre, apellido, DNI o N°).
+class _SelectorSocioDialog extends StatefulWidget {
+  final String token;
+  final String clubId;
+
+  const _SelectorSocioDialog({required this.token, required this.clubId});
+
+  @override
+  State<_SelectorSocioDialog> createState() => _SelectorSocioDialogState();
+}
+
+class _SelectorSocioDialogState extends State<_SelectorSocioDialog> {
+  final _ctrl = TextEditingController();
+  Timer? _debounce;
+  List<Map<String, dynamic>> _resultados = [];
+  bool _buscando = false;
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  void _onChanged(String texto) {
+    _debounce?.cancel();
+    final q = texto.trim();
+    if (q.length < 2) {
+      setState(() => _resultados = []);
+      return;
+    }
+    _debounce = Timer(const Duration(milliseconds: 350), () => _buscar(q));
+  }
+
+  Future<void> _buscar(String q) async {
+    setState(() => _buscando = true);
+    List<Map<String, dynamic>> res = [];
+    try {
+      res = await AdminApiService.buscarSocios(
+        token: widget.token,
+        clubId: widget.clubId,
+        query: q,
+      );
+    } catch (_) {
+      res = [];
+    }
+    if (!mounted) return;
+    setState(() {
+      _resultados = res;
+      _buscando = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Elegir socio'),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: _ctrl,
+              autofocus: true,
+              onChanged: _onChanged,
+              decoration: InputDecoration(
+                labelText: 'Nombre, apellido, DNI o N° de socio',
+                border: const OutlineInputBorder(),
+                suffixIcon: _buscando
+                    ? const Padding(
+                        padding: EdgeInsets.all(12),
+                        child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                      )
+                    : null,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Flexible(
+              child: _resultados.isEmpty
+                  ? const Padding(
+                      padding: EdgeInsets.all(12),
+                      child: Text('Escribí al menos 2 letras o números', style: TextStyle(color: Colors.black54)),
+                    )
+                  : ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: _resultados.length,
+                      itemBuilder: (_, i) {
+                        final s = _resultados[i];
+                        final nombre = '${s['apellido'] ?? ''} ${s['nombre'] ?? ''}'.trim();
+                        final nro = s['numero_socio'];
+                        final dni = s['dni'];
+                        return ListTile(
+                          dense: true,
+                          title: Text(nombre),
+                          subtitle: Text([
+                            if (nro != null) 'N° $nro',
+                            if (dni != null && dni.toString().isNotEmpty) 'DNI $dni',
+                          ].join(' · ')),
+                          onTap: () => Navigator.of(context).pop(s),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancelar'),
+        ),
+      ],
     );
   }
 }
