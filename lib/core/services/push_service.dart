@@ -1,6 +1,7 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'notification_store.dart';
+import 'storage_service.dart'; // ✅ NUEVO: AppSession para los helpers de topics
 
 class PushService {
   static final FirebaseMessaging _fm = FirebaseMessaging.instance;
@@ -313,5 +314,49 @@ static Future<void> subscribeToClub(String clubId) async {
     } else {
       await unsubscribeFromFaltaPago(clubId);
     }
+  }
+
+  // ======================================================
+  // ✅ NUEVO: baja de TODOS los topics de un socio en este celular.
+  // Se usa en el logout manual y al "Cambiar de socio", para que el
+  // celular no siga recibiendo push del socio anterior (ej: falta de pago).
+  // Nunca falla ni bloquea más de 6 segundos.
+  // ======================================================
+  static Future<void> unsubscribeAllForSession(AppSession session) async {
+    if (kIsWeb) return;
+    try {
+      final socio = session.socioObj;
+      final clubId = session.clubObj.id;
+      final act = socio.actividad;
+      final cat = socio.categoria;
+      final anio = socio.anioNacimiento == '—' ? null : socio.anioNacimiento;
+
+      final topics = <String>[
+        'club_$clubId',
+        _topicFaltaPago(clubId),
+        if (socio.id.trim().isNotEmpty) _topicSocio(clubId, socio.id),
+        if (act.trim().isNotEmpty) _topicActividad(clubId, act),
+        if (cat.trim().isNotEmpty) _topicCategoria(clubId, cat),
+        if (anio != null && anio.trim().isNotEmpty) _topicAnio(clubId, anio),
+      ];
+
+      await Future.wait(topics.map(_unsubscribe))
+          .timeout(const Duration(seconds: 6));
+    } catch (e) {
+      debugPrint('FCM ERROR (unsubscribeAllForSession): $e');
+    }
+  }
+
+  // ✅ NUEVO: mismo sync que ya se hace en login, pero tomando una AppSession
+  static Future<void> syncTopicsForSession(AppSession session) {
+    final socio = session.socioObj;
+    return syncTopicsForSocio(
+      clubId: session.clubObj.id,
+      socioId: socio.id,
+      actividad: socio.actividad,
+      categoria: socio.categoria,
+      anioNacimiento: socio.anioNacimiento == '—' ? null : socio.anioNacimiento,
+      enFaltaPago: !socio.alDia,
+    );
   }
 }

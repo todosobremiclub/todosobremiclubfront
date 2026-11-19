@@ -105,7 +105,13 @@ Future<void> main() async {
   // ======================================================
   final session = await StorageService.loadSession();
 
-  if (session != null && !kIsWeb) {
+  // ✅ NUEVO: con la sesión vencida (8 hs) NO se sincroniza: sus datos
+  // (por ej. "en falta de pago") pueden estar viejos y re-suscribirían al
+  // celular a un topic que ya no corresponde. Se sincroniza en el próximo login.
+  final sesionVencida =
+      session != null && await StorageService.isSessionExpired();
+
+  if (session != null && !kIsWeb && !sesionVencida) {
     final clubId = session.club['id'].toString();
     final socioObj = session.socioObj;
 

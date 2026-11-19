@@ -3,6 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/services/storage_service.dart';
 import '../../core/services/notification_store.dart';
+import '../../core/services/push_service.dart'; // ✅ NUEVO: desuscribir topics al cerrar sesión / cambiar de socio
 import '../../services/socio_service.dart'; // ✅ NUEVO: "Cambiar de socio"
 
 import '../login/login_screen.dart';
@@ -70,6 +71,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         token: data['token'],
         socio: Map<String, dynamic>.from(data['socio']),
         club: Map<String, dynamic>.from(data['club']),
+      );
+
+      // ✅ NUEVO: sacar al celular de los topics del socio anterior y
+      // suscribirlo a los del nuevo (antes quedaban los del anterior,
+      // incluido el de falta de pago).
+      await PushService.unsubscribeAllForSession(widget.session);
+      await PushService.syncTopicsForSession(
+        AppSession(
+          token: data['token'],
+          socio: Map<String, dynamic>.from(data['socio']),
+          club: Map<String, dynamic>.from(data['club']),
+        ),
       );
 
       if (!mounted) return;
@@ -173,7 +186,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Future<void> _checkSessionExpiry() async {
     final expirada = await StorageService.isSessionExpired();
     if (expirada && mounted) {
-      await _logout();
+      await _logout(desuscribirPush: false); // auto-logout: se mantienen los topics
     }
   }
 
@@ -192,7 +205,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     setState(() => _cumplesBadgeCount = count);
   }
 
-  Future<void> _logout() async {
+  Future<void> _logout({bool desuscribirPush = true}) async {
+    // ✅ NUEVO: en el logout MANUAL se da de baja a este celular de todos los
+    // topics del socio. En el auto-logout por 8 hs NO (si no, al vencer la
+    // sesión nadie recibiría más push).
+    if (desuscribirPush) {
+      await PushService.unsubscribeAllForSession(widget.session);
+    }
     await StorageService.clearSession();
     if (!mounted) return;
 
