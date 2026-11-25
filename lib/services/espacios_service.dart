@@ -107,6 +107,33 @@ class EspaciosService {
     return Map<String, dynamic>.from(data['reserva'] ?? {});
   }
 
+  /// Pide VARIOS horarios a la vez (hasta 6). Cada uno queda como una reserva
+  /// "pendiente" separada. [turnos]: [{'fecha': 'YYYY-MM-DD', 'hora_desde': 'HH:MM'}].
+  /// Si algún horario ya lo tomó otra persona, los demás igual se crean y ese
+  /// vuelve en `fallidos` ([{fecha, hora_desde, error}]).
+  Future<({List<Map<String, dynamic>> reservas, List<Map<String, dynamic>> fallidos})>
+      crearReservasMultiples({
+    required String token,
+    required String recursoId,
+    required List<Map<String, String>> turnos,
+    String? comentario,
+  }) async {
+    final data = await _post(
+      '/app/espacios/reservas/multiples',
+      token,
+      {
+        'recurso_id': recursoId,
+        'turnos': turnos
+            .map((t) => {'fecha': t['fecha'], 'hora_desde': t['hora_desde']})
+            .toList(),
+        if (comentario != null && comentario.trim().isNotEmpty) 'comentario': comentario.trim(),
+      },
+      'No se pudieron crear las reservas',
+      okStatus: 201,
+    );
+    return (reservas: _lista(data['reservas']), fallidos: _lista(data['fallidos']));
+  }
+
   /// Reservas del socio: próximas primero y los últimos 90 días de historial.
   Future<List<Map<String, dynamic>>> getMisReservas({required String token}) async {
     final data = await _get('/app/espacios/reservas/mias', token, 'No se pudieron cargar tus reservas');

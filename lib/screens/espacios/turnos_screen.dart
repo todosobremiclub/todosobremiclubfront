@@ -1,8 +1,9 @@
 // lib/screens/espacios/turnos_screen.dart
 //
-// Turnos libres de un espacio: se elige el día y el horario, y se confirma
-// con un comentario opcional. La reserva queda "pendiente" hasta que el club
-// la acepte (el socio recibe una notificación con la respuesta).
+// Turnos libres de un espacio: se elige el día y UNO O VARIOS horarios (hasta
+// 6, también de distintos días), y se confirma con un comentario opcional.
+// Cada horario queda como una reserva "pendiente" hasta que el club la acepte
+// (el socio recibe una notificación con la respuesta).
 import 'package:flutter/material.dart';
 import '../../core/services/storage_service.dart';
 import '../../services/espacios_service.dart';
@@ -27,6 +28,12 @@ class _TurnosScreenState extends State<TurnosScreen> {
   List<Map<String, dynamic>> _dias = []; // solo días con al menos un turno libre
   String? _fechaSel;
   bool _enviando = false;
+
+  /// Máximo de horarios que se pueden pedir de una vez (el backend también lo valida).
+  static const int _maxTurnos = 6;
+
+  /// Horarios elegidos: clave 'YYYY-MM-DD|HH:MM'. Se conservan al cambiar de día.
+  final Set<String> _sel = <String>{};
 
   String get _recursoId => (widget.recurso['id'] ?? '').toString();
   String get _nombre => (widget.recurso['nombre'] ?? '').toString();
@@ -70,6 +77,13 @@ class _TurnosScreenState extends State<TurnosScreen> {
         if (_fechaSel == null || !dias.any((d) => d['fecha'] == _fechaSel)) {
           _fechaSel = dias.isNotEmpty ? dias.first['fecha'] as String : null;
         }
+        // Se descartan los horarios elegidos que ya no están libres
+        final vigentes = <String>{
+          for (final d in dias)
+            for (final t in (d['turnos'] as List))
+              _clave(d['fecha'] as String, (t as Map)['hora_desde']),
+        };
+        _sel.removeWhere((k) => !vigentes.contains(k));
         _cargando = false;
       });
     } catch (e) {
@@ -87,25 +101,74 @@ class _TurnosScreenState extends State<TurnosScreen> {
     return List<Map<String, dynamic>>.from(d.first['turnos'] as List);
   }
 
-  Future<void> _reservar(Map<String, dynamic> turno) async {
-    final fecha = _fechaSel;
-    if (fecha == null || _enviando) return;
+  String _clave(String fecha, dynamic horaDesde) => '$fecha|$horaDesde';
+
+  int _cantidadElegidosDelDia(String fecha) => _sel.where((k) => k.startsWith('$fecha|')).length;
+
+  void _alternar(String fecha, Map<String, dynamic> turno) {
+    final k = _clave(fecha, turno['hora_desde']);
+    setState(() {
+      if (_sel.contains(k)) {
+        _sel.remove(k);
+      } else if (_sel.length >= _maxTurnos) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Podés pedir hasta $_maxTurnos horarios por vez.')),
+        );
+      } else {
+        _sel.add(k);
+      }
+    });
+  }
+
+  /// Horarios elegidos, ordenados por día y hora: [{fecha, hora_desde, hora_hasta}].
+  List<Map<String, String>> get _elegidos {
+    final out = <Map<String, String>>[];
+    for (final d in _dias) {
+      final fecha = d['fecha'] as String;
+      for (final t in (d['turnos'] as List)) {
+        final m = t as Map;
+        if (_sel.contains(_clave(fecha, m['hora_desde']))) {
+          out.add({
+            'fecha': fecha,
+            'hora_desde': (m['hora_desde'] ?? '').toString(),
+            'hora_hasta': (m['hora_hasta'] ?? '').toString(),
+          });
+        }
+      }
+    }
+    return out;
+  }
+
+  Future<void> _reservar() async {
+    final elegidos = _elegidos;
+    if (elegidos.isEmpty || _enviando) return;
     final comentarioCtrl = TextEditingController();
     final horasCancel = widget.recurso['cancelar_hasta_horas'];
+
+    // Resumen agrupado por día
+    final porDia = <String, List<Map<String, String>>>{};
+    for (final e in elegidos) {
+      porDia.putIfAbsent(e['fecha']!, () => []).add(e);
+    }
+    final plural = elegidos.length > 1;
 
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Confirmar reserva'),
+        title: Text(plural ? 'Confirmar ${elegidos.length} horarios' : 'Confirmar reserva'),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(_nombre, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              const SizedBox(height: 4),
-              Text('${fechaLarga(fecha)} · ${turno['hora_desde']} a ${turno['hora_hasta']}'),
-              const SizedBox(height: 12),
+              const SizedBox(height: 6),
+              for (final e in porDia.entries) ...[
+                Text(fechaLarga(e.key), style: const TextStyle(fontWeight: FontWeight.w600)),
+                for (final t in e.value) Text('  ${t['hora_desde']} a ${t['hora_hasta']}'),
+                const SizedBox(height: 6),
+              ],
+              const SizedBox(height: 6),
               TextField(
                 controller: comentarioCtrl,
                 maxLength: 300,
@@ -117,7 +180,7 @@ class _TurnosScreenState extends State<TurnosScreen> {
               ),
               const SizedBox(height: 4),
               Text(
-                'La reserva queda pendiente hasta que el club la confirme. Te avisamos por notificación.'
+                '${plural ? 'Cada horario queda como una solicitud pendiente' : 'La reserva queda pendiente'} hasta que el club la confirme. Te avisamos por notificación.'
                 '${horasCancel != null ? ' Una vez confirmada, podés cancelarla hasta $horasCancel h antes.' : ''}',
                 style: const TextStyle(fontSize: 12, color: Colors.black54),
               ),
@@ -126,7 +189,10 @@ class _TurnosScreenState extends State<TurnosScreen> {
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Volver')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Pedir turno')),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(plural ? 'Pedir ${elegidos.length} horarios' : 'Pedir turno'),
+          ),
         ],
       ),
     );
@@ -137,20 +203,49 @@ class _TurnosScreenState extends State<TurnosScreen> {
 
     setState(() => _enviando = true);
     try {
-      await _service.crearReserva(
-        token: widget.session.token,
-        recursoId: _recursoId,
-        fecha: fecha,
-        horaDesde: (turno['hora_desde'] ?? '').toString(),
-        comentario: comentario,
-      );
+      var creadas = 1;
+      var fallidos = <Map<String, dynamic>>[];
+      if (elegidos.length == 1) {
+        final e = elegidos.first;
+        await _service.crearReserva(
+          token: widget.session.token,
+          recursoId: _recursoId,
+          fecha: e['fecha']!,
+          horaDesde: e['hora_desde']!,
+          comentario: comentario,
+        );
+      } else {
+        final r = await _service.crearReservasMultiples(
+          token: widget.session.token,
+          recursoId: _recursoId,
+          turnos: [
+            for (final e in elegidos) {'fecha': e['fecha']!, 'hora_desde': e['hora_desde']!},
+          ],
+          comentario: comentario,
+        );
+        creadas = r.reservas.length;
+        fallidos = r.fallidos;
+      }
       if (!mounted) return;
-      setState(() => _enviando = false);
+      setState(() {
+        _enviando = false;
+        _sel.clear();
+      });
+
+      final detalleFallidos = fallidos
+          .map((f) => '• ${fechaCorta(f['fecha']?.toString())} ${f['hora_desde']}: ${f['error'] ?? 'no se pudo pedir'}')
+          .join('\n');
+      final base = creadas > 1
+          ? 'Enviamos $creadas solicitudes. Te avisamos cuando el club las confirme.'
+          : 'Tu reserva quedó pendiente. Te avisamos cuando el club la confirme.';
+      final mensaje = fallidos.isEmpty
+          ? base
+          : '$base\n\nNo se pudieron pedir estos horarios:\n$detalleFallidos';
       await showDialog<void>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: const Text('¡Pedido enviado!'),
-          content: const Text('Tu reserva quedó pendiente. Te avisamos cuando el club la confirme.'),
+          title: Text(fallidos.isEmpty ? '¡Pedido enviado!' : 'Pedido enviado con avisos'),
+          content: Text(mensaje),
           actions: [
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Listo')),
             FilledButton(
@@ -171,7 +266,7 @@ class _TurnosScreenState extends State<TurnosScreen> {
       if (!mounted) return;
       setState(() => _enviando = false);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(mensajeError(e))));
-      _cargar(); // por si el turno ya lo tomó otra persona
+      _cargar(); // por si algún turno ya lo tomó otra persona
     }
   }
 
@@ -199,7 +294,7 @@ class _TurnosScreenState extends State<TurnosScreen> {
             child: Text('Elegí el día', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
           ),
           SizedBox(
-            height: 74,
+            height: 84,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -209,6 +304,7 @@ class _TurnosScreenState extends State<TurnosScreen> {
                 final f = _dias[i]['fecha'] as String;
                 final sel = f == _fechaSel;
                 final partes = fechaCorta(f).split(' '); // ["Lun", "26/10"]
+                final cantSel = _cantidadElegidosDelDia(f);
                 return GestureDetector(
                   onTap: () => setState(() => _fechaSel = f),
                   child: Container(
@@ -227,6 +323,14 @@ class _TurnosScreenState extends State<TurnosScreen> {
                         const SizedBox(height: 2),
                         Text(partes.length > 1 ? partes[1] : '',
                             style: TextStyle(fontSize: 12, color: sel ? scheme.onPrimary : Colors.black54)),
+                        if (cantSel > 0) ...[
+                          const SizedBox(height: 2),
+                          Text('$cantSel ✓',
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: sel ? scheme.onPrimary : scheme.primary)),
+                        ],
                       ],
                     ),
                   ),
@@ -235,10 +339,17 @@ class _TurnosScreenState extends State<TurnosScreen> {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 4),
             child: Text(
               _fechaSel == null ? 'Horarios libres' : 'Horarios libres · ${fechaLarga(_fechaSel)}',
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+            ),
+          ),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: Text(
+              'Podés elegir más de un horario (hasta $_maxTurnos), también de otros días.',
+              style: TextStyle(fontSize: 12.5, color: Colors.black54),
             ),
           ),
           Expanded(
@@ -248,14 +359,26 @@ class _TurnosScreenState extends State<TurnosScreen> {
                 spacing: 10,
                 runSpacing: 10,
                 children: turnos.map((t) {
-                  return OutlinedButton(
-                    onPressed: _enviando ? null : () => _reservar(t),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      side: BorderSide(color: scheme.primary),
-                    ),
-                    child: Text('${t['hora_desde']} - ${t['hora_hasta']}'),
-                  );
+                  final fecha = _fechaSel ?? '';
+                  final elegido = _sel.contains(_clave(fecha, t['hora_desde']));
+                  final texto = '${t['hora_desde']} - ${t['hora_hasta']}';
+                  return elegido
+                      ? FilledButton.icon(
+                          onPressed: _enviando ? null : () => _alternar(fecha, t),
+                          icon: const Icon(Icons.check, size: 18),
+                          style: FilledButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          ),
+                          label: Text(texto),
+                        )
+                      : OutlinedButton(
+                          onPressed: _enviando ? null : () => _alternar(fecha, t),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            side: BorderSide(color: scheme.primary),
+                          ),
+                          child: Text(texto),
+                        );
                 }).toList(),
               ),
             ),
@@ -271,6 +394,36 @@ class _TurnosScreenState extends State<TurnosScreen> {
         foregroundColor: scheme.onPrimary,
         title: Text(_nombre),
       ),
+      bottomNavigationBar: _sel.isEmpty || _cargando
+          ? null
+          : SafeArea(
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  border: Border(top: BorderSide(color: Colors.black12)),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        _sel.length == 1 ? '1 horario elegido' : '${_sel.length} horarios elegidos',
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: _enviando ? null : () => setState(_sel.clear),
+                      child: const Text('Limpiar'),
+                    ),
+                    const SizedBox(width: 6),
+                    FilledButton(
+                      onPressed: _enviando ? null : _reservar,
+                      child: Text(_sel.length == 1 ? 'Continuar' : 'Pedir ${_sel.length}'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
       body: SafeArea(
         child: Stack(
           children: [
