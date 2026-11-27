@@ -1,6 +1,11 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:mobile_scanner/mobile_scanner.dart';
+
+import '../../core/config/api_config.dart';
+import '../../core/services/session_service.dart';
+import '../../core/services/storage_service.dart';
 
 class ControlAccesoScreen extends StatefulWidget {
   const ControlAccesoScreen({super.key});
@@ -13,6 +18,7 @@ class _ControlAccesoScreenState extends State<ControlAccesoScreen> {
   final MobileScannerController _controller = MobileScannerController();
 
   bool _escaneando = true;
+  bool _verificando = false;
   Map<String, dynamic>? _socioData;
   bool? _habilitado;
   String _mensaje = '';
@@ -23,82 +29,112 @@ class _ControlAccesoScreenState extends State<ControlAccesoScreen> {
     'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
   ];
 
-  int? _ymToIndex(String? ym) {
-    if (ym == null) return null;
+  String _fmtYM(String? ym) {
+    if (ym == null) return '—';
     final match = RegExp(r'^(\d{4})-(\d{2})$').firstMatch(ym.trim());
-    if (match == null) return null;
+    if (match == null) return '—';
     final y = int.tryParse(match.group(1)!);
     final mo = int.tryParse(match.group(2)!);
-    if (y == null || mo == null || mo < 1 || mo > 12) return null;
-    return (y * 12) + (mo - 1);
+    if (y == null || mo == null || mo < 1 || mo > 12) return '—';
+    return '${_meses[mo - 1]} $y';
   }
 
-  String _fmtYM(String? ym) {
-    final idx = _ymToIndex(ym);
-    if (idx == null) return '—';
-    final y = idx ~/ 12;
-    final m = idx % 12;
-    return '${_meses[m]} $y';
+  void _mostrarRechazo(String mensaje) {
+    setState(() {
+      _escaneando = false;
+      _verificando = false;
+      _socioData = null;
+      _habilitado = false;
+      _mensaje = mensaje;
+      _ultimoFmt = '—';
+    });
   }
 
-  int _nowIndex() {
-    final now = DateTime.now();
-    return now.year * 12 + (now.month - 1);
-  }
-
-  void _onDetect(BarcodeCapture capture) {
-    if (!_escaneando) return;
+  /// 🔒 El QR ya no se "interpreta" en el celular: se manda al servidor, que valida la firma, que
+  /// el carnet sea de ESTE club y calcula el estado de la cuota con datos reales.
+  /// - QR nuevo: un token firmado (texto).
+  /// - QR viejo (JSON con socioId, de socios que no actualizaron la app): se manda solo el socioId.
+  Future<void> _onDetect(BarcodeCapture capture) async {
+    if (!_escaneando || _verificando) return;
 
     final barcodes = capture.barcodes;
     if (barcodes.isEmpty) return;
 
-    final raw = barcodes.first.rawValue;
-    if (raw == null || raw.isEmpty) return;
+    final raw = barcodes.first.rawValue?.trim();
+    if (raw == null || raw.isEmpty || raw.length > 2000) return;
 
-    Map<String, dynamic> data;
-    try {
-      data = jsonDecode(raw) as Map<String, dynamic>;
-    } catch (_) {
-      setState(() {
-        _escaneando = false;
-        _socioData = null;
-        _habilitado = false;
-        _mensaje = 'El código escaneado no es un carnet válido.';
-        _ultimoFmt = '—';
-      });
-      return;
-    }
-
-    final ultimoPago = data['ultimoPago']?.toString();
-    final last = _ymToIndex(ultimoPago);
-    final now = _nowIndex();
-
-    bool ok;
-    String mensaje;
-
-    if (last == null) {
-      ok = false;
-      mensaje = 'No hay último pago válido en el QR.';
-    } else if (last >= (now - 1) && last <= (now + 1)) {
-      ok = true;
-      mensaje = 'Cuota al día (mes actual / anterior / siguiente).';
+    Map<String, dynamic> cuerpo;
+    if (raw.startsWith('{')) {
+      try {
+        final obj = jsonDecode(raw);
+        if (obj is! Map || obj['socioId'] == null) {
+          _mostrarRechazo('El código escaneado no es un carnet válido.');
+          return;
+        }
+        cuerpo = {'legacy': {'socioId': obj['socioId'].toString()}};
+      } catch (_) {
+        _mostrarRechazo('El código escaneado no es un carnet válido.');
+        return;
+      }
     } else {
-      ok = false;
-      mensaje = 'Cuota vencida (último pago anterior al mes anterior).';
+      cuerpo = {'qr': raw};
     }
 
     setState(() {
       _escaneando = false;
-      _socioData = data;
-      _habilitado = ok;
-      _mensaje = mensaje;
-      _ultimoFmt = _fmtYM(ultimoPago);
+      _verificando = true;
     });
+
+    try {
+      final admin = await StorageService.loadAdminSession();
+      if (admin == null) {
+        _mostrarRechazo('Sesión vencida. Volvé a iniciar sesión.');
+        return;
+      }
+
+      final res = await http
+          .post(
+            Uri.parse('${ApiConfig.baseUrl}/club/${admin.clubId}/acceso/verificar'),
+            headers: {
+              'Authorization': 'Bearer ${admin.token}',
+              'Content-Type': 'application/json',
+            },
+            body: jsonEncode(cuerpo),
+          )
+          .timeout(const Duration(seconds: 10));
+
+      if (res.statusCode == 401) {
+        await SessionService.forceAdminLogout();
+        return;
+      }
+
+      final data = jsonDecode(res.body);
+      if (res.statusCode != 200 || data is! Map || data['ok'] != true) {
+        _mostrarRechazo(
+          (data is Map ? data['error']?.toString() : null) ?? 'No se pudo validar el carnet.',
+        );
+        return;
+      }
+
+      if (!mounted) return;
+      final socio = data['socio'] is Map ? Map<String, dynamic>.from(data['socio'] as Map) : null;
+      setState(() {
+        _verificando = false;
+        _socioData = socio;
+        _habilitado = data['habilitado'] == true;
+        _mensaje = data['motivo']?.toString() ?? '';
+        _ultimoFmt = _fmtYM(socio?['ultimo_pago']?.toString());
+      });
+    } catch (_) {
+      if (!mounted) return;
+      _mostrarRechazo('No se pudo validar el carnet (revisá la conexión) e intentá de nuevo.');
+    }
   }
 
   void _escanearOtro() {
     setState(() {
       _escaneando = true;
+      _verificando = false;
       _socioData = null;
       _habilitado = null;
       _mensaje = '';

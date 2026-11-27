@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -19,7 +20,17 @@ class CarnetScreen extends StatefulWidget {
   State<CarnetScreen> createState() => _CarnetScreenState();
 }
 
-class _CarnetScreenState extends State<CarnetScreen> {
+class _CarnetScreenState extends State<CarnetScreen> with WidgetsBindingObserver {
+  // 🔒 QR FIRMADO: el QR ya NO lleva datos personales (ni DNI). Contiene solo un token de vida
+  // corta que emite el servidor (GET /app/carnet/qr) y que el lector valida contra el backend.
+  // Se renueva solo mientras el carnet está abierto y al volver a la app.
+  static const Duration _qrRefresco = Duration(minutes: 2);
+  static const Duration _qrVidaMax = Duration(seconds: 290); // el servidor lo vence a los 300s
+  String? _qrToken;
+  DateTime? _qrObtenidoAt;
+  bool _qrCargando = false;
+  Timer? _qrTimer;
+
   Uint8List? _fotoPreviewBytes;
   bool _subiendoFoto = false;
 
@@ -30,10 +41,60 @@ class _CarnetScreenState extends State<CarnetScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _cargarQr();
+    _qrTimer = Timer.periodic(_qrRefresco, (_) => _cargarQr());
     final ahora = DateTime.now();
     _mesAsistenciaActual =
         '${ahora.year}-${ahora.month.toString().padLeft(2, '0')}';
     _cargarAsistencias(_mesAsistenciaActual);
+  }
+
+  @override
+  void dispose() {
+    _qrTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _cargarQr();
+  }
+
+  /// Pide al servidor un token de QR nuevo. Si falla y todavía hay uno vigente, se sigue usando.
+  Future<void> _cargarQr() async {
+    if (_qrCargando) return;
+    _qrCargando = true;
+    try {
+      final res = await http
+          .get(
+            Uri.parse('${ApiConfig.baseUrl}/app/carnet/qr'),
+            headers: {'Authorization': 'Bearer ${widget.session.token}'},
+          )
+          .timeout(const Duration(seconds: 10));
+      final data = jsonDecode(res.body);
+      if (res.statusCode == 200 && data is Map && data['ok'] == true && data['qr'] is String) {
+        if (!mounted) return;
+        setState(() {
+          _qrToken = data['qr'] as String;
+          _qrObtenidoAt = DateTime.now();
+        });
+      }
+    } catch (_) {
+      // sin conexión: se mantiene el token anterior hasta que venza
+    } finally {
+      _qrCargando = false;
+      if (mounted) setState(() {});
+    }
+  }
+
+  /// Token vigente o null (si nunca se pudo obtener, o ya venció y no se pudo renovar).
+  String? get _qrVigente {
+    final t = _qrToken;
+    final at = _qrObtenidoAt;
+    if (t == null || at == null) return null;
+    return DateTime.now().difference(at) < _qrVidaMax ? t : null;
   }
 
   Future<Map<String, dynamic>?> _fetchAsistenciasMes(String mes) async {
@@ -326,20 +387,7 @@ class _CarnetScreenState extends State<CarnetScreen> {
 
     final alDia = socio.alDia == true;
 
-    final qrData = jsonEncode({
-      'clubId': club.id,
-      'clubNombre': club.nombre,
-      'socioId': socio.id,
-      'numero': socio.numero,
-      'dni': socio.dni,
-      'nombre': socio.nombre,
-      'apellido': socio.apellido,
-      'actividad': socio.actividad,
-      'categoria': socio.categoria,
-      'fechaIngreso': socio.fechaIngreso,
-      'alDia': socio.alDia,
-      'ultimoPago': socio.ultimoPago,
-    });
+    final qrVigente = _qrVigente;
 
     return SafeArea(
       child: LayoutBuilder(
@@ -609,14 +657,34 @@ class _CarnetScreenState extends State<CarnetScreen> {
                                   child: SizedBox(
                                     width: qrSize,
                                     height: qrSize,
-                                    child: QrImageView(
-                                      data: qrData,
-                                      backgroundColor: Colors.white,
-                                      eyeStyle: const QrEyeStyle(
-                                        eyeShape: QrEyeShape.square,
-                                        color: Colors.black,
-                                      ),
-                                    ),
+                                    child: qrVigente != null
+                                        ? QrImageView(
+                                            data: qrVigente,
+                                            backgroundColor: Colors.white,
+                                            eyeStyle: const QrEyeStyle(
+                                              eyeShape: QrEyeShape.square,
+                                              color: Colors.black,
+                                            ),
+                                          )
+                                        : InkWell(
+                                            onTap: _cargarQr,
+                                            child: Center(
+                                              child: _qrCargando
+                                                  ? const CircularProgressIndicator(strokeWidth: 2)
+                                                  : const Column(
+                                                      mainAxisAlignment: MainAxisAlignment.center,
+                                                      children: [
+                                                        Icon(Icons.refresh, color: Colors.black54),
+                                                        SizedBox(height: 4),
+                                                        Text(
+                                                          'Sin conexión\nTocá para reintentar',
+                                                          textAlign: TextAlign.center,
+                                                          style: TextStyle(fontSize: 10, color: Colors.black54),
+                                                        ),
+                                                      ],
+                                                    ),
+                                            ),
+                                          ),
                                   ),
                                 );
                               },

@@ -1,10 +1,53 @@
 import 'dart:convert';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../models/club.dart';
 import '../../models/socio.dart';
 
 class StorageService {
+  // 🔒 Etapa 5 (F-07): tokens, datos de sesión y credenciales recordadas se guardan CIFRADOS
+  // (Android Keystore / iOS Keychain). SharedPreferences queda solo para banderas y fechas.
+  static const FlutterSecureStorage _sec = FlutterSecureStorage(
+    aOptions: AndroidOptions(encryptedSharedPreferences: true),
+  );
+
+  /// Lee de almacenamiento seguro. Si no está, busca el valor viejo en SharedPreferences
+  /// (instalaciones anteriores), lo migra al almacenamiento seguro y lo borra del viejo lugar.
+  static Future<String?> _getSecure(String key) async {
+    try {
+      final v = await _sec.read(key: key);
+      if (v != null) return v;
+    } catch (_) {
+      // Keystore corrupto o restaurado de otro dispositivo: se trata como "sin dato".
+      try {
+        await _sec.deleteAll();
+      } catch (_) {}
+    }
+    final prefs = await SharedPreferences.getInstance();
+    final legacy = prefs.getString(key);
+    if (legacy == null) return null;
+    try {
+      await _sec.write(key: key, value: legacy);
+      await prefs.remove(key);
+    } catch (_) {}
+    return legacy;
+  }
+
+  static Future<void> _setSecure(String key, String value) async {
+    await _sec.write(key: key, value: value);
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.containsKey(key)) await prefs.remove(key);
+  }
+
+  static Future<void> _delSecure(String key) async {
+    try {
+      await _sec.delete(key: key);
+    } catch (_) {}
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.containsKey(key)) await prefs.remove(key);
+  }
+
   static const _kToken = 'app_token';
   static const _kSocio = 'app_socio';
   static const _kClub = 'app_club';
@@ -19,6 +62,7 @@ class StorageService {
   static const _kAdminRole = 'admin_role';
   static const _kAdminClubId = 'admin_club_id';
   static const _kAdminClubName = 'admin_club_name';
+  static const _kAdminLoginAt = 'admin_login_at'; // 🔒 vencimiento de la sesión de admin
 
   /// Guarda token + socio + club como JSON (string)
   static Future<void> saveSession({
@@ -27,19 +71,18 @@ class StorageService {
     required Map<String, dynamic> club,
   }) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_kToken, token);
-    await prefs.setString(_kSocio, jsonEncode(socio));
-    await prefs.setString(_kClub, jsonEncode(club));
+    await _setSecure(_kToken, token);
+    await _setSecure(_kSocio, jsonEncode(socio));
+    await _setSecure(_kClub, jsonEncode(club));
     // ✅ NUEVO: marca el momento del login para el auto-logout de 8hs
     await prefs.setString(_kLoginAt, DateTime.now().toIso8601String());
   }
 
   /// Devuelve null si falta algo
   static Future<AppSession?> loadSession() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString(_kToken);
-    final socioStr = prefs.getString(_kSocio);
-    final clubStr = prefs.getString(_kClub);
+    final token = await _getSecure(_kToken);
+    final socioStr = await _getSecure(_kSocio);
+    final clubStr = await _getSecure(_kClub);
 
     if (token == null || token.isEmpty) return null;
     if (socioStr == null || socioStr.isEmpty) return null;
@@ -68,9 +111,9 @@ class StorageService {
 
   static Future<void> clearSession() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_kToken);
-    await prefs.remove(_kSocio);
-    await prefs.remove(_kClub);
+    await _delSecure(_kToken);
+    await _delSecure(_kSocio);
+    await _delSecure(_kClub);
     await prefs.remove(_kLoginAt); // ✅ NUEVO
   }
 
@@ -89,21 +132,32 @@ class StorageService {
     required String clubName,
   }) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_kAdminToken, token);
-    await prefs.setString(_kAdminEmail, email);
-    await prefs.setString(_kAdminRole, role);
-    await prefs.setString(_kAdminClubId, clubId);
-    await prefs.setString(_kAdminClubName, clubName);
+    await _setSecure(_kAdminToken, token);
+    await _setSecure(_kAdminEmail, email);
+    await _setSecure(_kAdminRole, role);
+    await _setSecure(_kAdminClubId, clubId);
+    await _setSecure(_kAdminClubName, clubName);
+    await prefs.setString(_kAdminLoginAt, DateTime.now().toIso8601String());
+  }
+
+  /// 🔒 true si pasaron 8 hs o más desde el login del admin (o no hay fecha guardada:
+  /// sesiones creadas antes de esta versión se consideran vencidas y piden login de nuevo).
+  static Future<bool> isAdminSessionExpired() async {
+    final prefs = await SharedPreferences.getInstance();
+    final s = prefs.getString(_kAdminLoginAt);
+    if (s == null || s.isEmpty) return true;
+    final at = DateTime.tryParse(s);
+    if (at == null) return true;
+    return DateTime.now().difference(at) >= sessionMaxAge;
   }
 
   /// Devuelve null si no hay sesión de admin guardada
   static Future<AdminSession?> loadAdminSession() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString(_kAdminToken);
-    final email = prefs.getString(_kAdminEmail);
-    final role = prefs.getString(_kAdminRole);
-    final clubId = prefs.getString(_kAdminClubId);
-    final clubName = prefs.getString(_kAdminClubName);
+    final token = await _getSecure(_kAdminToken);
+    final email = await _getSecure(_kAdminEmail);
+    final role = await _getSecure(_kAdminRole);
+    final clubId = await _getSecure(_kAdminClubId);
+    final clubName = await _getSecure(_kAdminClubName);
 
     if (token == null || token.isEmpty) return null;
     if (email == null || role == null) return null;
@@ -120,11 +174,12 @@ class StorageService {
 
   static Future<void> clearAdminSession() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_kAdminToken);
-    await prefs.remove(_kAdminEmail);
-    await prefs.remove(_kAdminRole);
-    await prefs.remove(_kAdminClubId);
-    await prefs.remove(_kAdminClubName);
+    await _delSecure(_kAdminToken);
+    await _delSecure(_kAdminEmail);
+    await _delSecure(_kAdminRole);
+    await _delSecure(_kAdminClubId);
+    await _delSecure(_kAdminClubName);
+    await prefs.remove(_kAdminLoginAt);
   }
 
   // ======================================================
@@ -134,8 +189,7 @@ class StorageService {
   // la sesión iniciada (eso ya lo hacen saveSession/loadSession): esto
   // solo evita tener que volver a tipear los datos de acceso después de
   // un logout manual o del auto-logout de 8hs.
-  // ⚠️ Se guarda en SharedPreferences sin cifrar, igual que el token de
-  // sesión (mismo nivel de protección que ya tiene hoy la app).
+  // 🔒 Se guarda en almacenamiento seguro cifrado (Keystore / Keychain).
   // ======================================================
   static const _kRememberMe = 'app_remember_me';
   static const _kRememberedUsuario = 'app_remembered_usuario';
@@ -147,15 +201,15 @@ class StorageService {
   }) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_kRememberMe, true);
-    await prefs.setString(_kRememberedUsuario, usuario);
-    await prefs.setString(_kRememberedContrasena, contrasena);
+    await _setSecure(_kRememberedUsuario, usuario);
+    await _setSecure(_kRememberedContrasena, contrasena);
   }
 
   static Future<void> clearRememberedCredentials() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_kRememberMe, false);
-    await prefs.remove(_kRememberedUsuario);
-    await prefs.remove(_kRememberedContrasena);
+    await _delSecure(_kRememberedUsuario);
+    await _delSecure(_kRememberedContrasena);
   }
 
   /// Devuelve null si el socio nunca activó "Recordarme" (o lo desactivó).
@@ -164,8 +218,8 @@ class StorageService {
     final activo = prefs.getBool(_kRememberMe) ?? false;
     if (!activo) return null;
 
-    final usuario = prefs.getString(_kRememberedUsuario);
-    final contrasena = prefs.getString(_kRememberedContrasena);
+    final usuario = await _getSecure(_kRememberedUsuario);
+    final contrasena = await _getSecure(_kRememberedContrasena);
     if (usuario == null || contrasena == null) return null;
 
     return RememberedCredentials(usuario: usuario, contrasena: contrasena);
@@ -176,7 +230,7 @@ class StorageService {
   // de ADMINISTRADOR (email + contraseña). Se guarda aparte del de socio
   // para que cambiar de modo en LoginScreen no mezcle ni pise los datos
   // recordados del otro modo.
-  // ⚠️ Igual que el de socio: sin cifrar en SharedPreferences.
+  // 🔒 Igual que el de socio: almacenamiento seguro cifrado.
   // ======================================================
   static const _kAdminRememberMe = 'app_admin_remember_me';
   static const _kAdminRememberedEmail = 'app_admin_remembered_email';
@@ -188,15 +242,15 @@ class StorageService {
   }) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_kAdminRememberMe, true);
-    await prefs.setString(_kAdminRememberedEmail, email);
-    await prefs.setString(_kAdminRememberedPassword, password);
+    await _setSecure(_kAdminRememberedEmail, email);
+    await _setSecure(_kAdminRememberedPassword, password);
   }
 
   static Future<void> clearRememberedAdminCredentials() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_kAdminRememberMe, false);
-    await prefs.remove(_kAdminRememberedEmail);
-    await prefs.remove(_kAdminRememberedPassword);
+    await _delSecure(_kAdminRememberedEmail);
+    await _delSecure(_kAdminRememberedPassword);
   }
 
   /// Devuelve null si el administrador nunca activó "Recordarme" (o lo
@@ -206,8 +260,8 @@ class StorageService {
     final activo = prefs.getBool(_kAdminRememberMe) ?? false;
     if (!activo) return null;
 
-    final email = prefs.getString(_kAdminRememberedEmail);
-    final password = prefs.getString(_kAdminRememberedPassword);
+    final email = await _getSecure(_kAdminRememberedEmail);
+    final password = await _getSecure(_kAdminRememberedPassword);
     if (email == null || password == null) return null;
 
     return RememberedCredentials(usuario: email, contrasena: password);

@@ -2,7 +2,7 @@ name: todosobremiclub_app
 description: "A new Flutter project."
 publish_to: 'none'
 
-version: 3.0.34+61
+version: 3.0.35+62
 
 environment:
   sdk: ^3.11.1
@@ -23,6 +23,7 @@ dependencies:
 
   # Almacenamiento interno
   shared_preferences: ^2.2.3
+  flutter_secure_storage: ^9.2.4
 
   # Iconos iOS style
   cupertino_icons: ^1.0.8

@@ -72,6 +72,11 @@ class MyApp extends StatelessWidget {
     // ✅ Primero chequeamos si hay sesión de ADMINISTRADOR guardada
     final adminSession = await StorageService.loadAdminSession();
     if (adminSession != null) {
+      // 🔒 Etapa 5 (F-20): la sesión de admin también vence a las 8 hs (igual que la de socio).
+      if (await StorageService.isAdminSessionExpired()) {
+        await StorageService.clearAdminSession();
+        return _SesionInicial(socio: null);
+      }
       return _SesionInicial(admin: adminSession);
     }
 
